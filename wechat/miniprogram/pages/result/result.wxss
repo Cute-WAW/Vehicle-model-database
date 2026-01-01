@@ -1,0 +1,164 @@
+.vehicle-header {
+  text-align: center;
+  padding: 20rpx;
+}
+
+.vehicle-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.price-card {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  color: #fff;
+}
+
+.price-card .price-label {
+  font-size: 28rpx;
+  opacity: 0.9;
+}
+
+.price-card .price-value {
+  font-size: 80rpx;
+  font-weight: 700;
+  color: #fff;
+}
+
+.price-card .price-unit {
+  font-size: 28rpx;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.price-card .price-range {
+  font-size: 26rpx;
+  opacity: 0.9;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+
+.summary {
+  font-size: 28rpx;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 20rpx;
+}
+
+.confidence {
+  font-size: 28rpx;
+  margin-bottom: 20rpx;
+}
+
+.confidence-value.high { color: #4CAF50; }
+.confidence-value.medium { color: #FF9800; }
+.confidence-value.low { color: #f44336; }
+
+.factor-title {
+  font-size: 28rpx;
+  font-weight: 500;
+  margin: 20rpx 0 10rpx;
+}
+
+.factor-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.factor-item:last-child {
+  border-bottom: none;
+}
+
+.factor-label {
+  flex: 1;
+}
+
+.factor-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.factor-reason {
+  display: block;
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 4rpx;
+}
+
+.factor-delta {
+  font-weight: 600;
+  font-size: 30rpx;
+}
+
+.factor-delta.positive {
+  color: #4CAF50;
+}
+
+.factor-delta.negative {
+  color: #f44336;
+}
+
+
+/* 相似成交列表 */
+.similar-list {
+  margin-top: 10rpx;
+}
+
+.similar-item {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.similar-item:last-child {
+  border-bottom: none;
+}
+
+.similar-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10rpx;
+}
+
+.similar-name {
+  font-size: 28rpx;
+  color: #333;
+  flex: 1;
+  margin-right: 20rpx;
+  line-height: 1.4;
+}
+
+.similar-price {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #f44336;
+  white-space: nowrap;
+}
+
+.similar-row-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.similar-info {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.similar-tag {
+  font-size: 20rpx;
+  padding: 2rpx 8rpx;
+  background: #e3f2fd;
+  color: #2196F3;
+  border-radius: 6rpx;
+}
+
+.button-area {
+  margin-top: 40rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 30rpx;
+}

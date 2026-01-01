@@ -1,0 +1,54 @@
+.header {
+  text-align: center;
+  padding: 40rpx 0;
+}
+
+.title {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #4CAF50;
+}
+
+.subtitle {
+  display: block;
+  font-size: 26rpx;
+  color: #999;
+  margin-top: 10rpx;
+}
+
+.button-area {
+  margin-top: 40rpx;
+  display: flex;
+  gap: 20rpx;
+}
+
+.btn-primary {
+  flex: 1;
+  margin: 0;
+  border-radius: 16rpx;
+}
+
+.btn-next {
+  width: 100rpx !important;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 2rpx solid #4CAF50;
+  border-radius: 16rpx;
+  font-size: 40rpx;
+  color: #4CAF50;
+}
+
+.secondary-buttons {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 20rpx;
+}
+
+.secondary-buttons .btn-secondary {
+  flex: 1;
+  margin: 0;
+}

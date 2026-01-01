@@ -1,0 +1,121 @@
+<view class="container">
+  <!-- 标题 -->
+  <view class="header">
+    <text class="title">🚗 二手车估价</text>
+    <text class="subtitle">快速获取车辆估价</text>
+  </view>
+
+  <!-- 表单卡片 -->
+  <view class="card">
+    <!-- 车辆全称 -->
+    <view class="form-item">
+      <text class="form-label">车辆全称 *</text>
+      <input 
+        class="form-input" 
+        placeholder="如: 丰田 凯美瑞 2015款 2.5G"
+        value="{{vehicleFullName}}"
+        data-field="vehicleFullName"
+        bindinput="onInputChange"
+      />
+    </view>
+
+    <!-- 品牌车系 -->
+    <view class="form-item">
+      <text class="form-label">品牌车系 *</text>
+      <input 
+        class="form-input" 
+        placeholder="如: 丰田-凯美瑞"
+        value="{{brandSeries}}"
+        data-field="brandSeries"
+        bindinput="onInputChange"
+      />
+    </view>
+
+    <!-- 使用年限 -->
+    <view class="form-item">
+      <text class="form-label">使用年限: {{years}} 年</text>
+      <slider 
+        min="1" max="20" step="0.5" 
+        value="{{years}}" 
+        activeColor="#4CAF50"
+        bindchange="onSliderChange"
+      />
+    </view>
+
+    <!-- 行驶里程 -->
+    <view class="form-item">
+      <text class="form-label">行驶里程 (万公里)</text>
+      <input 
+        class="form-input" 
+        type="digit"
+        placeholder="如: 8.5"
+        value="{{mileage}}"
+        data-field="mileage"
+        bindinput="onInputChange"
+      />
+    </view>
+
+    <!-- 车辆评级 -->
+    <view class="form-item">
+      <text class="form-label">车辆评级</text>
+      <view class="grade-selector">
+        <view 
+          class="grade-option {{grade === '优' ? 'active' : ''}}"
+          data-value="优"
+          bindtap="onGradeSelect"
+        >优</view>
+        <view 
+          class="grade-option {{grade === '中' ? 'active' : ''}}"
+          data-value="中"
+          bindtap="onGradeSelect"
+        >中</view>
+        <view 
+          class="grade-option {{grade === '差' ? 'active' : ''}}"
+          data-value="差"
+          bindtap="onGradeSelect"
+        >差</view>
+      </view>
+    </view>
+
+    <!-- 新车价格 -->
+    <view class="form-item">
+      <text class="form-label">新车价格 (万元, 可选)</text>
+      <input 
+        class="form-input" 
+        type="digit"
+        placeholder="如: 25"
+        value="{{newPrice}}"
+        data-field="newPrice"
+        bindinput="onInputChange"
+      />
+    </view>
+
+    <!-- 城市 -->
+    <view class="form-item">
+      <text class="form-label">城市</text>
+      <input 
+        class="form-input" 
+        placeholder="如: 北京"
+        value="{{city}}"
+        data-field="city"
+        bindinput="onInputChange"
+      />
+    </view>
+  </view>
+
+  <!-- 按钮区域 -->
+  <view class="button-area">
+    <button class="btn-primary" bindtap="onSubmit" loading="{{loading}}">
+      🔍 开始估价
+    </button>
+    <button class="btn-next" bindtap="onNextVehicle">
+      🎲
+    </button>
+  </view>
+
+  <view class="secondary-buttons">
+    <button class="btn-secondary" bindtap="goToHistory">
+      📋 历史记录
+    </button>
+  </view>
+</view>

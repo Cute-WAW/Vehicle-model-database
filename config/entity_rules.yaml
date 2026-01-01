@@ -1,0 +1,110 @@
+# 实体识别规则配置
+
+# 预处理规则
+preprocessing:
+  # 需要移除的噪音模式
+  remove_patterns:
+    - ".*车源\\n?"
+    - ".*车行\\n?"
+    - "^\\s+"
+  
+  # 分隔符标准化
+  separator_normalize:
+    from: ["/", "\\", "|", "、"]
+    to: " "
+
+# 实体识别规则
+entities:
+  # 品牌 - 词典匹配
+  brand:
+    type: dictionary
+    file: dictionaries/brands.txt
+    priority: 100
+    
+  # 车系 - 词典匹配
+  series:
+    type: dictionary
+    file: dictionaries/series.txt
+    priority: 90
+    
+  # 年款 - 正则匹配
+  year:
+    type: regex
+    pattern: '(\d{4})款?'
+    group: 1
+    priority: 80
+    
+  # 排量 - 正则匹配 (燃油车)
+  displacement:
+    type: regex
+    patterns:
+      - '(\d+\.?\d*)\s*(T|TSI|THP|TFSI|L|t)(?![Kk])'
+      - '(\d+\.\d+)(?!\d)'
+    group: [1, 2]
+    priority: 70
+    
+  # 续航里程 - 正则匹配 (电动车)
+  range_km:
+    type: regex
+    pattern: '(\d{3,4})\s*([Kk][Mm]|公里)?'
+    group: 1
+    priority: 70
+    
+  # 档位 - 词典匹配
+  transmission:
+    type: dictionary
+    words:
+      - 自动
+      - 手动
+      - 手自一体
+      - 双离合
+      - 单离合
+      - CVT
+      - AT
+      - MT
+      - DCT
+      - AMT
+    priority: 60
+    
+  # 驱动方式 - 词典匹配
+  drive:
+    type: dictionary
+    words:
+      - 四驱
+      - 前驱
+      - 后驱
+      - 两驱
+      - AWD
+      - 4WD
+    priority: 50
+    
+  # 款式 - 正则匹配
+  edition:
+    type: regex
+    pattern: '([\u4e00-\u9fa5]+款)'
+    group: 1
+    priority: 40
+    
+  # 版式 - 正则匹配
+  trim:
+    type: regex
+    patterns:
+      - '([\u4e00-\u9fa5\w]+版)'
+      - '([\u4e00-\u9fa5\w]+型(?:Plus)?)'
+    group: 1
+    priority: 30
+
+# 动力类型推断规则
+vehicle_type_inference:
+  rules:
+    - keywords: ["增程"]
+      type: "增程"
+    - keywords: ["纯电", "EV", "ev"]
+      type: "纯电"
+    - keywords: ["混动", "PHEV", "phev", "DMi", "dmi", "DM-i"]
+      type: "混动"
+    - has_entity: "range_km"
+      type: "纯电"
+    - has_entity: "displacement"
+      type: "燃油"
+    - default: "未知"

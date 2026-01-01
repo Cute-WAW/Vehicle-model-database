@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车型库匹配调试工具</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚗 车型库匹配调试工具</h1>
+            <p class="subtitle">实体识别 · 规则匹配 · 可视化调试</p>
+        </header>
+
+        <section class="input-section">
+            <div class="input-group">
+                <input type="text" id="queryInput" placeholder="输入车辆名称，如：宝马/X1/2016款 2.0T 自动 豪华版" />
+                <button id="matchBtn" onclick="doMatch()">匹配</button>
+            </div>
+            <div class="shortcuts">
+                <span>快捷示例：</span>
+                <button class="shortcut" onclick="fillExample('宝马/X1/2016款 2.0T 自动 20Li豪华型前驱')">宝马 X1</button>
+                <button class="shortcut" onclick="fillExample('大众 帕萨特 2023款 1.4TSI 双离合 280TSI 星空精英版')">大众 帕萨特</button>
+                <button class="shortcut" onclick="fillExample('特斯拉 Model 3 2023款 420KM 长续航版')">特斯拉 Model 3</button>
+                <button class="shortcut" onclick="fillExample('中升车源\n比亚迪 汉 2024款 纯电 605KM 尊贵型')">比亚迪 汉</button>
+            </div>
+        </section>
+
+        <section class="result-section">
+            <div class="result-grid">
+                <!-- 实体识别结果 -->
+                <div class="card entities-card">
+                    <h2>📋 实体识别结果</h2>
+                    <div id="entitiesResult" class="entities-content">
+                        <p class="placeholder">等待输入...</p>
+                    </div>
+                </div>
+
+                <!-- 匹配过程 -->
+                <div class="card process-card">
+                    <h2>🔍 匹配过程</h2>
+                    <div id="processResult" class="process-content">
+                        <p class="placeholder">等待输入...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 匹配结果 -->
+            <div class="card matches-card">
+                <h2>🎯 匹配结果 <span id="matchCount"></span></h2>
+                <div id="matchesResult" class="matches-content">
+                    <p class="placeholder">等待输入...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 配置面板 -->
+        <section class="config-section">
+            <h2>⚙️ 配置调整</h2>
+            <div class="config-grid">
+                <div class="config-item">
+                    <label for="minScore">最低分数阈值</label>
+                    <input type="number" id="minScore" value="150" />
+                </div>
+                <div class="config-item">
+                    <label for="topK">返回数量</label>
+                    <input type="number" id="topK" value="5" />
+                </div>
+                <button onclick="applyConfig()">应用配置</button>
+            </div>
+        </section>
+
+        <footer>
+            <p>状态: <span id="statusIndicator">🟢 就绪</span> | 
+               索引大小: <span id="indexSize">-</span> | 
+               处理时间: <span id="processTime">-</span>
+            </p>
+        </footer>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

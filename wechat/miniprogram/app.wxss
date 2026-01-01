@@ -1,0 +1,224 @@
+/* 全局样式 */
+
+page {
+  background-color: #f5f5f5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  color: #333;
+  line-height: 1.5;
+}
+
+/* 通用容器 */
+.container {
+  padding: 20rpx;
+}
+
+/* 卡片样式 */
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+}
+
+.card-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 20rpx;
+  display: flex;
+  align-items: center;
+}
+
+.card-title .icon {
+  margin-right: 10rpx;
+}
+
+/* 表单样式 */
+.form-item {
+  margin-bottom: 30rpx;
+}
+
+.form-label {
+  font-size: 28rpx;
+  color: #666;
+  margin-bottom: 10rpx;
+}
+
+.form-input {
+  background: #f8f8f8;
+  border: 2rpx solid #e0e0e0;
+  border-radius: 12rpx;
+  padding: 0 20rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  font-size: 30rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  border-color: #4CAF50;
+  background: #fff;
+}
+
+/* 按钮样式 */
+.btn-primary {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  color: #fff;
+  border: none;
+  border-radius: 50rpx;
+  padding: 24rpx 0;
+  font-size: 32rpx;
+  font-weight: 500;
+  text-align: center;
+  box-shadow: 0 4rpx 15rpx rgba(76, 175, 80, 0.3);
+}
+
+.btn-primary:active {
+  background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  background: #fff;
+  color: #4CAF50;
+  border: 2rpx solid #4CAF50;
+  border-radius: 50rpx;
+  padding: 22rpx 0;
+  font-size: 28rpx;
+}
+
+/* 价格显示 */
+.price-display {
+  text-align: center;
+  padding: 40rpx 0;
+}
+
+.price-value {
+  font-size: 72rpx;
+  font-weight: 700;
+  color: #4CAF50;
+  line-height: 1.2;
+}
+
+.price-unit {
+  font-size: 32rpx;
+  color: #666;
+  margin-left: 10rpx;
+}
+
+.price-range {
+  font-size: 28rpx;
+  color: #999;
+  margin-top: 10rpx;
+}
+
+/* 标签样式 */
+.tag {
+  display: inline-block;
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+  font-size: 24rpx;
+  margin-right: 10rpx;
+  margin-bottom: 10rpx;
+}
+
+.tag-success {
+  background: #e8f5e9;
+  color: #4CAF50;
+}
+
+.tag-warning {
+  background: #fff8e1;
+  color: #FF9800;
+}
+
+.tag-error {
+  background: #ffebee;
+  color: #f44336;
+}
+
+.tag-info {
+  background: #e3f2fd;
+  color: #2196F3;
+}
+
+/* 列表项 */
+.list-item {
+  background: #fff;
+  padding: 30rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+  display: flex;
+  align-items: center;
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.list-item:active {
+  background: #f5f5f5;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 100rpx 40rpx;
+  color: #999;
+}
+
+.empty-state .icon {
+  font-size: 80rpx;
+  margin-bottom: 20rpx;
+}
+
+/* 加载状态 */
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40rpx;
+}
+
+/* 评级选择 */
+.grade-selector {
+  display: flex;
+  gap: 20rpx;
+}
+
+.grade-option {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx;
+  border: 2rpx solid #e0e0e0;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  transition: all 0.2s;
+}
+
+.grade-option.active {
+  border-color: #4CAF50;
+  background: #e8f5e9;
+  color: #4CAF50;
+  font-weight: 500;
+}
+
+.grade-option[data-value="优"].active {
+  border-color: #4CAF50;
+  background: #e8f5e9;
+  color: #4CAF50;
+}
+
+.grade-option[data-value="中"].active {
+  border-color: #FF9800;
+  background: #fff8e1;
+  color: #FF9800;
+}
+
+.grade-option[data-value="差"].active {
+  border-color: #f44336;
+  background: #ffebee;
+  color: #f44336;
+}

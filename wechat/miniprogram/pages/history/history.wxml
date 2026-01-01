@@ -1,0 +1,41 @@
+<view class="container">
+  <view class="header">
+    <text class="title">📋 估价历史</text>
+    <text class="count">共 {{total}} 条记录</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+
+  <!-- 列表 -->
+  <view class="list" wx:elif="{{list.length > 0}}">
+    <view 
+      class="list-item" 
+      wx:for="{{list}}" 
+      wx:key="id"
+      data-item="{{item}}"
+      bindtap="onItemTap"
+    >
+      <view class="item-main">
+        <text class="item-name">{{item.vehicle_full_name}}</text>
+        <view class="item-info">
+          <text class="item-price">{{item.predicted_price}}万</text>
+          <text class="item-range">({{item.price_low}}-{{item.price_high}})</text>
+        </view>
+        <text class="item-date">{{item.created_at}}</text>
+      </view>
+      <view class="item-action" catchtap="onDelete" data-id="{{item.id}}">
+        <text class="delete-btn">删除</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:else>
+    <text class="icon">📭</text>
+    <text>暂无估价记录</text>
+    <text class="hint">去首页估价一辆车吧</text>
+  </view>
+</view>

@@ -1,0 +1,56 @@
+# =============================================================================
+# Adaptive B2B Price Range Configuration
+# =============================================================================
+#
+# Purpose: Solve the low hit-rate problem for low-price cars
+# Solution: Expand B2B price range based on predicted price
+# Formula: min_half_width = max(mid * percentage, absolute)
+#
+# -----------------------------------------------------------------------------
+# Parameter Tuning Results (N=2000 test samples)
+# -----------------------------------------------------------------------------
+# | Version | <1w (pct/abs)  | 1-2w       | 2-3w | Hit Rate  |
+# |---------|----------------|------------|------|-----------|
+# | Base    | -              | -          | -    | 36.25%    |
+# | v1      | 15%/1500       | 10%/1500   | 8%   | 45.35%    |
+# | v2      | 20%/2000       | 12%/1500   | 8%   | 48.15%    |
+# | v3      | 10%/1000       | 8%/1000    | 5%   | 40.05%    |
+# | v4      | 15%/2000       | 10%/2000   | 8%   | 49.75%    |
+# | v5      | 25%/2500       | 15%/2000   | 10%  | 53.25% ** |
+# -----------------------------------------------------------------------------
+# Recommendation: Use v2 for balance between accuracy and range width
+# =============================================================================
+
+# Enable/Disable adaptive range expansion
+enabled: true
+
+# Price types to apply adaptive range (for future extension)
+# Currently only b2b is implemented
+price_types:
+  b2b: true    # B2B wholesale price between dealers
+  c2b: false   # C2B trade-in price (consumer to dealer) - Reserved
+  b2c: false   # B2C retail price (dealer to consumer) - Reserved
+
+# Price segment rules (unit: wan yuan / 10000 RMB)
+# percentage: relative to mid price (0.20 = 20%)
+# absolute: minimum half-width in wan yuan (0.20 = 2000 RMB)
+rules:
+  # Cars < 1 wan: at least +/-20% or +/-2000 RMB
+  low_price:
+    threshold: 1.0
+    percentage: 0.20
+    absolute: 0.20
+
+  # Cars 1-2 wan: at least +/-12% or +/-1500 RMB
+  mid_price:
+    threshold: 2.0
+    percentage: 0.12
+    absolute: 0.15
+
+  # Cars 2-3 wan: at least +/-8%
+  high_price:
+    threshold: 3.0
+    percentage: 0.08
+    absolute: 0.0
+
+  # Cars >= 3 wan: no expansion (use original range)

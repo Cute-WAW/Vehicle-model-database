@@ -1,0 +1,62 @@
+# 匹配引擎配置
+
+# 权重配置
+weights:
+  brand: 100        # 品牌 - 必须匹配
+  series: 80        # 车系 - 必须匹配
+  year: 5           # 年款 - 最低权重
+  displacement: 40  # 排量
+  range_km: 40      # 续航里程
+  transmission: 30  # 档位
+  drive: 20         # 驱动方式
+  trim: 15          # 版式
+
+# 阈值配置
+thresholds:
+  min_score: 150        # 最低返回分数
+  high_confidence: 250  # 高置信度阈值
+
+# 返回数量
+top_k: 5
+
+# 模糊匹配规则
+fuzzy_rules:
+  # 年款容差
+  year:
+    exact_score: 50     # 完全匹配得分
+    off_by_1_score: 30  # 相差1年得分
+    off_by_2_score: 10  # 相差2年得分
+    tolerance: 2        # 最大容差年数
+    
+  # 续航容差
+  range_km:
+    tolerance: 20       # 容差 ±20km
+    partial_score: 30   # 容差内得分
+
+# 排量等价映射
+displacement_equivalents:
+  "1.4T": ["1.4TSI", "1.4THP", "1.4"]
+  "1.5T": ["1.5TSI", "1.5THP", "1.5"]
+  "2.0T": ["2.0TSI", "2.0TFSI", "2.0THP", "2.0"]
+  "1.5L": ["1.5"]
+  "1.6L": ["1.6"]
+  "2.0L": ["2.0"]
+
+# 档位等价映射（双向等价）
+transmission_equivalents:
+  "自动": ["AT", "自动挡", "手自一体"]
+  "手自一体": ["自动", "AT", "自动挡"]
+  "手动": ["MT", "手动挡"]
+  "双离合": ["DCT", "DSG"]
+
+# 驱动方式等价映射（两驱 = 前驱/后驱）
+drive_equivalents:
+  "两驱": ["前驱", "后驱"]
+  "前驱": ["两驱"]
+  "后驱": ["两驱"]
+  "四驱": ["AWD", "4WD"]
+
+# 批量处理配置
+batch:
+  chunk_size: 100     # 批量处理分块大小
+  max_workers: 4      # 并行工作线程数
