@@ -5,3 +5,10 @@ __pycache__/
 .vscode/
 .DS_Store
 *.log
+
+# Sensitive Data
+data/
+wechat/backend/price_eval.db
+*.db
+*.sqlite
+output/
