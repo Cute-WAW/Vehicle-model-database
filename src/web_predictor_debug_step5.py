@@ -11,11 +11,11 @@
     python web_predictor_debug.py
     
     # 或指定端口
-    python web_predictor_debug.py --port 8003
+    python web_predictor_debug.py --port 8087
 
 访问：
-    http://localhost:8003/
-    http://localhost:8003/docs (API文档)
+    http://localhost:8087/
+    http://localhost:8087/docs (API文档)
 """
 
 import argparse
@@ -628,7 +628,7 @@ async def health():
 
 def main():
     parser = argparse.ArgumentParser(description='二手车残值预测 Web 服务')
-    parser.add_argument('--port', type=int, default=8003, help='服务端口')
+    parser.add_argument('--port', type=int, default=8087, help='服务端口')
     parser.add_argument('--host', default='0.0.0.0', help='绑定地址')
     
     args = parser.parse_args()

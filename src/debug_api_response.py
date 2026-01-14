@@ -2,7 +2,7 @@
 import requests
 import json
 
-url = "http://localhost:8003/predict"
+url = "http://localhost:8087/predict"
 data = {
     "vehicle_full_name": "吉利 帝豪 2017款 1.5L CVT向上互联版",
     "brand_series": "吉利-帝豪",

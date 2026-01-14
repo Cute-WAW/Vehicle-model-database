@@ -3,7 +3,7 @@ const config = {
     // API 地址 (开发环境用本地，生产环境改为云服务器地址)
     // apiBaseUrl: 'http://localhost:8003/api',
     // 真机调试请使用本机局域网IP
-    apiBaseUrl: 'http://192.168.0.100:8003/api',
+    apiBaseUrl: 'http://192.168.50.74:8003/api',
     // apiBaseUrl: 'https://your-domain.com/api',
 };
 

@@ -222,6 +222,36 @@ class ResidualPredictor:
             
             model_price = model_result['predicted_price']
             
+            # ========== Step 2.5: 针对性优化规则调整 (Heuristic Adjustments) ==========
+            # 基于各细分市场基线分析进行的修正 (通过 optimization_analysis.py 发现普遍低估)
+            # 1. 新能源 (NEV): 整体预测偏低, 补偿 3%
+            # 2. 新车 (0-3年): 贬值曲线可能过陡, 补偿 5%
+            # 3. 高价车 (>15万): 贬值率可能偏低, 补偿 5%
+            
+            heuristic_adjustments = []
+            
+            # 新能源
+            if self._is_nev(vehicle_full_name):
+                model_price *= 1.03
+                heuristic_adjustments.append("NEV(+3%)")
+                
+            # 新车 (0-3年)
+            if years <= 3:
+                model_price *= 1.05
+                heuristic_adjustments.append("NewCar(+5%)")
+                
+            # 高价车
+            if model_price > 15.0:
+                model_price *= 1.05
+                heuristic_adjustments.append("HighEnd(+5%)")
+                
+            if heuristic_adjustments:
+                # 更新模型预测值，作为后续调整的基础
+                result_info = "+".join(heuristic_adjustments)
+                logger.info(f"应用规则修正: {vehicle_full_name} -> {result_info}, Price: {model_result['predicted_price']:.2f}->{model_price:.2f}")
+                debug.model_prediction = model_price 
+
+            
             # ========== Step 3: 查找完全相同的记录 ==========
             identical = self.data_index.find_identical_records(
                 vehicle_full_name, brand_series, years, grade, city, mileage
@@ -526,6 +556,12 @@ class ResidualPredictor:
     def get_available_car_types(self) -> List[str]:
         """获取可用的车辆类别列表"""
         return self.price_predictor.list_available_car_types()
+
+    def _is_nev(self, vehicle_name: str) -> bool:
+        """判断是否为新能源车"""
+        vehicle_name = str(vehicle_name).upper()
+        keywords = ['电', '混动', 'DM-I', 'EV', 'PHEV', '增程', '蔚来', '小鹏', '理想', '特斯拉', 'MODEL', 'ID.']
+        return any(k in vehicle_name for k in keywords)
 
 
 if __name__ == '__main__':
