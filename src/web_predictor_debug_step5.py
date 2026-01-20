@@ -35,6 +35,7 @@ os.chdir(Path(__file__).parent.parent)
 
 from residual_predictor_step5 import ResidualPredictor, ResidualPredictionResult
 from price_logic_step6 import explain_price
+from db_supabase import verify_user, create_user
 
 # 微信小程序 API
 import sys
@@ -61,6 +62,20 @@ class PredictRequest(BaseModel):
     city: str = Field("", description="城市", example="成都")
     mileage: float = Field(0.0, description="行驶里程(万公里)", example=19.95)
     new_price: Optional[float] = Field(None, description="新车价格(万元)，不传则自动推断")
+
+
+class AuthRequest(BaseModel):
+    """认证请求"""
+    username: str
+    password: str
+
+
+class RegisterRequest(BaseModel):
+    """注册请求"""
+    username: str
+    password: str
+    nickname: Optional[str] = "用户"
+    email: Optional[str] = None
 
 
 class SimilarVehicleInfo(BaseModel):
@@ -153,9 +168,21 @@ async def startup_event():
     global predictor
     logger.info("初始化残值预测器...")
     
-    # 使用参与建模的清洗后数据
-    data_path = Path("output/residual_value_data_for_build_model.csv").absolute()
+    # 切换回之前的总体数据
+    # data_path = Path("output/batch_modeling_results.csv").absolute()
+    # data_path = Path("output/residual_value_data_for_build_model.csv").absolute()
+    data_path = Path("output/merged_residual_value_data.csv").absolute()
+    
+    if not data_path.exists():
+        logger.warning(f"文件不存在: {data_path}，尝试使用备用文件")
+        data_path = Path("output/batch_modeling_results.csv").absolute()
+        
     logger.info(f"使用数据文件: {data_path}")
+    
+    # 注意：如果 residual_data_index.pkl 已存在且未包含 source 字段，
+    # ResidualDataIndex 需要被强制重建才能生效。
+    # 这里我们简单地依靠 ResidualDataIndex 的缓存检查机制（mtime check）。
+    # 如果 batch_modeling_results.csv 是新的，它应该会触发重建。
     
     predictor = ResidualPredictor(residual_data_csv=str(data_path))
     logger.info("预测器初始化完成")
@@ -164,6 +191,47 @@ async def startup_event():
     if WECHAT_API_ENABLED:
         app.include_router(wechat_router)
         logger.info("微信小程序 API 已加载: /api/*")
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page():
+    """登录页面"""
+    login_html_path = Path(__file__).parent / 'web' / 'templates' / 'login.html'
+    if login_html_path.exists():
+        return HTMLResponse(content=login_html_path.read_text(encoding='utf-8'))
+    return HTMLResponse(content="<h1>Login Page Not Found</h1>", status_code=404)
+
+
+@app.post("/api/auth/login")
+async def api_login(request: AuthRequest):
+    """用户登录接口"""
+    success, user, message = verify_user(request.username, request.password)
+    if success:
+        return {"success": True, "token": "mock-token-for-now", "user": user, "message": message}
+    return {"success": False, "message": message}
+
+
+@app.get("/register", response_class=HTMLResponse)
+async def register_page():
+    """注册页面"""
+    register_html_path = Path(__file__).parent / 'web' / 'templates' / 'register.html'
+    if register_html_path.exists():
+        return HTMLResponse(content=register_html_path.read_text(encoding='utf-8'))
+    return HTMLResponse(content="<h1>Register Page Not Found</h1>", status_code=404)
+
+
+@app.post("/api/auth/register")
+async def api_register(request: RegisterRequest):
+    """用户注册接口"""
+    success, message = create_user(
+        username=request.username, 
+        password=request.password,
+        nickname=request.nickname,
+        email=request.email
+    )
+    if success:
+        return {"success": True, "message": message}
+    return {"success": False, "message": message}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -366,7 +434,7 @@ async def root():
                                 
                                 html += `
                                     <div class="similar-vehicle" style="${bgStyle}">
-                                        成交价: <strong>${r.used_price}万</strong> | 城市: ${r.city} | 年限: ${r.years}年 | 
+                                        成交价: <strong>${r.used_price}万</strong> | 城市: ${r.city} | 年限: ${r.years}年 | 来源: ${r.source || 'unknown'} |
                                         <span style="color: ${parseFloat(errorPct) < 10 ? '#4CAF50' : parseFloat(errorPct) < 20 ? '#FF9800' : '#f44336'}; font-weight: bold;">
                                             误差: ${errorPct}%
                                         </span>
@@ -463,6 +531,9 @@ async def root():
                                                 </span>
                                                 <span style="background: #fff; padding: 3px 10px; border-radius: 4px; border: 1px solid #ddd;">
                                                     🛣️ ${v.mileage || 0}万km
+                                                </span>
+                                                <span style="background: #e3f2fd; padding: 3px 10px; border-radius: 4px; border: 1px solid #90caf9; color: #1565c0;">
+                                                    📂 ${v.source || 'unknown'}
                                                 </span>
                                             </div>
                                             <div style="margin-top: 8px; font-size: 11px; color: #888;">

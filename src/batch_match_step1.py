@@ -223,10 +223,10 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="批量匹配车辆到力洋车型库")
-    parser.add_argument("--input", "-i", default="data/youxinpai_vehicles.csv",
-                        help="输入CSV文件路径 (默认: data/youxinpai_vehicles.csv)")
-    parser.add_argument("--output", "-o", default="output/batch_match_result.txt",
-                        help="输出文件路径 (默认: output/batch_match_result.txt)")
+    parser.add_argument("--input", "-i", default="data/cheyipai_data_clean.csv",
+                        help="输入CSV文件路径 (默认: data/cheyipai_data_clean.csv)")
+    parser.add_argument("--output", "-o", default="output/cheyipai_match_result.txt",
+                        help="输出文件路径 (默认: output/cheyipai_match_result.txt)")
     parser.add_argument("--limit", "-n", type=int, default=None,
                         help="限制处理数量（调试用）")
     parser.add_argument("--column", "-c", default=None,

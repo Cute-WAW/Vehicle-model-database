@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车易拍业务分析报告</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 10px 0;
+        }
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        .error-high { color: #e74c3c; }
+        .error-med { color: #f39c12; }
+        .error-low { color: #27ae60; }
+        .nav-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .back-link {
+            text-decoration: none;
+            color: #3498db;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-header">
+            <h1>📊 车易拍业务分析报告</h1>
+            <a href="/" class="back-link">← 返回匹配工具</a>
+        </div>
+
+        <!-- 核心指标 -->
+        <div class="dashboard-grid">
+            <div class="stat-card">
+                <div class="stat-label">总样本量</div>
+                <div class="stat-value" id="totalCount">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">平均误差 (MAPE)</div>
+                <div class="stat-value" id="mape">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">准确率 (±20%)</div>
+                <div class="stat-value" id="acc20">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">平均偏差</div>
+                <div class="stat-value" id="bias">-</div>
+            </div>
+        </div>
+
+        <!-- 图表区域 -->
+        <div class="dashboard-grid">
+            <div class="chart-container">
+                <h3>品牌误差排行 (Top 10)</h3>
+                <canvas id="brandChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>车龄保值率曲线</h3>
+                <canvas id="ageChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 异常案例 -->
+        <div class="card">
+            <h2>⚠️ 重点关注异常案例 (Top 5 偏差)</h2>
+            <div class="table-container">
+                <table id="anomalyTable">
+                    <thead>
+                        <tr>
+                            <th>车型</th>
+                            <th>车龄/里程</th>
+                            <th>城市</th>
+                            <th>实际价</th>
+                            <th>预测价</th>
+                            <th>误差率</th>
+                            <th>偏差金额</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 动态填充 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadReport() {
+            try {
+                const response = await fetch('/api/analysis/report');
+                const data = await response.json();
+                
+                // 填充核心指标
+                document.getElementById('totalCount').textContent = data.summary.total;
+                document.getElementById('mape').textContent = (data.summary.mape * 100).toFixed(1) + '%';
+                document.getElementById('acc20').textContent = (data.summary.acc_20 * 100).toFixed(1) + '%';
+                document.getElementById('bias').textContent = data.summary.avg_bias.toFixed(2) + '万';
+
+                // 渲染品牌图表
+                renderBrandChart(data.brands);
+                
+                // 渲染车龄图表
+                renderAgeChart(data.age_curve);
+                
+                // 填充异常表格
+                fillAnomalyTable(data.anomalies);
+                
+            } catch (error) {
+                console.error('加载报告失败:', error);
+                alert('加载报告失败，请检查后端服务');
+            }
+        }
+
+        function renderBrandChart(brands) {
+            const ctx = document.getElementById('brandChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: brands.map(b => b.name),
+                    datasets: [{
+                        label: '平均误差率 (%)',
+                        data: brands.map(b => (b.mape * 100).toFixed(1)),
+                        backgroundColor: 'rgba(52, 152, 219, 0.6)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function renderAgeChart(ageData) {
+            const ctx = document.getElementById('ageChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ageData.map(a => a.group),
+                    datasets: [{
+                        label: '实际保值率 (%)',
+                        data: ageData.map(a => (a.rate * 100).toFixed(1)),
+                        borderColor: '#e74c3c',
+                        tension: 0.3,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function fillAnomalyTable(anomalies) {
+            const tbody = document.querySelector('#anomalyTable tbody');
+            tbody.innerHTML = anomalies.map(item => `
+                <tr>
+                    <td>${item.name}</td>
+                    <td>${item.year}年 / ${item.mileage}万km</td>
+                    <td>${item.city}</td>
+                    <td>${item.actual}万</td>
+                    <td>${item.pred}万</td>
+                    <td class="error-high">${(item.error_pct * 100).toFixed(0)}%</td>
+                    <td>${item.bias > 0 ? '+' : ''}${item.bias.toFixed(2)}万</td>
+                </tr>
+            `).join('');
+        }
+
+        // 页面加载时执行
+        loadReport();
+    </script>
+</body>
+</html>

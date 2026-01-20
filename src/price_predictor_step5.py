@@ -387,8 +387,8 @@ def main():
     parser = argparse.ArgumentParser(description='二手车价格预测工具')
     parser.add_argument('--brand_series', '-b', help='品牌-车系，如 "本田-飞度"')
     parser.add_argument('--car_type', '-t', help='车辆类别，如 "轿车-紧凑型车"')
-    parser.add_argument('--year', '-y', type=float, required=True, help='使用年限')
-    parser.add_argument('--new_price', '-p', type=float, required=True, help='新车价格（万元）')
+    parser.add_argument('--year', '-y', type=float, help='使用年限')
+    parser.add_argument('--new_price', '-p', type=float, help='新车价格（万元）')
     parser.add_argument('--list_models', '-l', action='store_true', help='列出可用模型')
     
     args = parser.parse_args()
@@ -406,6 +406,10 @@ def main():
             print(f"  - {name}")
         return
     
+    if not args.year or not args.new_price:
+        print("错误: 进行预测时，必须指定 --year 和 --new_price")
+        return
+
     if args.brand_series:
         print(f"品牌车系预测: {args.brand_series}")
         result = predictor.predict_by_brand_series(args.brand_series, args.year, args.new_price)

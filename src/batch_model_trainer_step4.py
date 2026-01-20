@@ -389,25 +389,35 @@ def safe_filename(name: str) -> str:
 
 
 if __name__ == '__main__':
-    # 简单测试
-    data_path = '../output/residual_value_data.csv'
-    trainer = BatchModelTrainer(data_path, min_samples=100)
+    # 使用 batch_modeling_results.csv 进行测试分析
+    data_path = '../output/batch_modeling_results.csv'
+    print(f"正在加载数据: {data_path}")
     
-    # 测试品牌车系分组
+    # 初始化训练器 (min_samples=40 以覆盖更多车系)
+    trainer = BatchModelTrainer(data_path, min_samples=40)
+    
+    # 获取所有符合条件的分组
     groups = trainer.get_brand_series_groups()
-    print(f"品牌车系数量: {len(groups)}")
+    print(f"找到 {len(groups)} 个有效品牌车系: {list(groups.keys())}")
     
-    # 测试单个模型训练
-    test_series = '本田-飞度'
-    if test_series in groups:
-        model, _ = trainer.train_for_group(groups[test_series], test_series)
+    # 遍历每个车系进行建模分析
+    for series_name in groups:
+        print(f"\n{'='*40}")
+        print(f"分析车系: {series_name}")
+        
+        # 训练模型
+        model, df_clean = trainer.train_for_group(groups[series_name], series_name)
+        
         if model:
-            print(f"\n{test_series} 模型信息:")
-            print(f"  类型: {model.model_type}")
-            print(f"  公式: {model.get_formula()}")
-            print(f"  R²: {model.r2:.4f}")
-            print(f"\n预测示例:")
+            print(f"建模结果: 成功")
+            print(f"  - 模型类型: {model.model_type}")
+            print(f"  - 拟合公式: {model.get_formula()}")
+            print(f"  - 拟合优度 (R²): {model.r2:.4f}")
+            print(f"  - 有效样本: {model.sample_count} (原始: {len(groups[series_name])})")
+            
+            print(f"  - 典型年份残值率预测:")
             for year in [1, 3, 5, 8, 10]:
                 rate = model.predict(year)
-                price = model.predict_price(year, 10.0)
-                print(f"  {year}年: 残值率 {rate:.1%}, 预测价格 {price}万 (假设新车10万)")
+                print(f"    第{year:<2}年: {rate:.1%}")
+        else:
+            print(f"建模结果: 失败 (数据分布可能不满足建模要求)")

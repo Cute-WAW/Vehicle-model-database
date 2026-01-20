@@ -262,7 +262,8 @@ class ResidualPredictor:
                     'used_price': r.used_price,
                     'adjusted_price': r.adjusted_price,
                     'years': r.years,
-                    'city': r.city
+                    'city': r.city,
+                    'source': getattr(r, 'source', 'unknown')
                 }
                 for r in identical
             ]
@@ -283,6 +284,7 @@ class ResidualPredictor:
                     'grade': s.record.grade,
                     'city': s.record.city,
                     'mileage': s.record.mileage,
+                    'source': getattr(s.record, 'source', 'unknown'),
                     'score': s.score,
                     'matched_features': s.matched_features
                 }

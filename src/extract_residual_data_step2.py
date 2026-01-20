@@ -16,7 +16,7 @@ from datetime import datetime
 
 
 # 配置评估时间过滤阈值 (只输出该日期及之后的记录)
-EVAL_THRESHOLD = datetime(2025, 1, 1)
+EVAL_THRESHOLD = datetime(2023, 1, 1)
 
 
 def clean_city_name(city_str: str) -> str:
@@ -48,7 +48,136 @@ def parse_date_yxp(date_str: str) -> tuple:
     return None, None
 
 
-def calculate_years(eval_year: int, eval_month: int, reg_year: int, reg_month: int) -> float:
+def parse_date_cyp(date_str: str) -> tuple:
+    """解析车易拍日期格式: YYYY年M月D日"""
+    try:
+        # 移除可能存在的空格
+        date_str = date_str.strip()
+        match = re.match(r'(\d{4})年(\d{1,2})月(\d{1,2})日', date_str)
+        if match:
+            return int(match.group(1)), int(match.group(2))
+    except:
+        pass
+    return None, None
+
+
+def parse_cheyipai_line(input_line: str, match_line: str, score_line: str = None) -> dict:
+    """
+    解析车易拍格式数据
+    字段索引: 0:品牌, 1:车型, 2:上牌时间, 3:行驶里程, 4:颜色, 5:城市, 6:车况, 7:是否营运, 8:成交价格, 9:成交时间
+    """
+    try:
+        # 解析输入行
+        input_parts = input_line.split('|')
+        if len(input_parts) < 2:
+            return None
+        
+        # 提取车辆全称
+        # 格式: 【输入】日产 2016款 轩逸... | 日产,2016款...
+        vehicle_full_name = input_parts[0].replace('【输入】', '').strip()
+        
+        # 提取CSV部分
+        input_data = input_parts[1].strip().split(',')
+        if len(input_data) < 10:
+            return None
+        
+        # 1. 品牌车系
+        if score_line:
+            brand, series = extract_brand_series_from_score(score_line)
+            if brand and series:
+                brand_series = f"{brand}-{series}"
+            else:
+                brand_series = f"{input_data[0].strip()}-未知车系"
+        else:
+            brand_series = f"{input_data[0].strip()}-未知车系"
+
+        # 2. 日期与年限
+        reg_date_str = input_data[2].strip()  # 2016年4月1日
+        deal_date_str = input_data[9].strip() # 11月28日 (可能缺少年份)
+        
+        reg_year, reg_month = parse_date_cyp(reg_date_str)
+        
+        # 处理成交时间缺少年份的问题 (假设为2024年，或根据上下文推断)
+        # 临时策略：如果成交时间不含年份，默认补全为2024年（基于之前观察）
+        if "年" not in deal_date_str:
+            deal_date_str = f"2024年{deal_date_str}"
+            
+        eval_year, eval_month = parse_date_cyp(deal_date_str)
+
+        if not (reg_year and eval_year):
+            # print(f"日期解析失败: reg={reg_date_str}, deal={deal_date_str}")
+            return None
+            
+        # 计算使用年限
+        years = calculate_years(eval_year, eval_month, reg_year, reg_month)
+        if years is None:
+            # print(f"年限计算失败: {eval_year}-{eval_month} vs {reg_year}-{reg_month}")
+            return None
+
+        # 3. 价格 (单位: 万元)
+        try:
+            used_price = float(input_data[8].strip())
+        except:
+            # print(f"价格解析失败: {input_data[8]}")
+            return None
+            
+        # 4. 里程 (单位: 万公里)
+        try:
+            mileage = float(input_data[3].strip())
+        except:
+            mileage = None
+
+        # 5. 评级 (80B -> B)
+        # 车易拍评级格式如 "80B", "65D". 取最后一个字母
+        grade_raw = input_data[6].strip()
+        grade_char = grade_raw[-1] if grade_raw else 'C' # 默认C
+        grade_label = map_grade(grade_char)
+        
+        # 6. 新车价格 (从匹配行)
+        if '无匹配结果' in match_line:
+            return None
+        
+        match_parts = match_line.split('|')
+        if len(match_parts) < 2:
+            return None
+        
+        match_data = match_parts[1].strip().split(',')
+        # 新车价格是逗号分隔的第5项（索引4）
+        if len(match_data) < 12:
+            return None
+            
+        try:
+            new_price = float(match_data[4].strip())
+        except:
+            return None
+            
+        # 7. 车况校正
+        adjusted_price = calculate_adjusted_price(used_price, grade_label)
+        
+        # 8. 城市
+        city = clean_city_name(input_data[5])
+
+        return {
+            '数据来源': '车易拍',
+            '车辆全称': vehicle_full_name,
+            '品牌车系': brand_series,
+            '新车的价格': new_price,
+            '二手车的成交价': used_price,
+            '车况校正价': adjusted_price,
+            '使用年限': years,
+            '车辆评级': grade_label,
+            '车辆大类': match_data[7].strip(),
+            '车辆小类': match_data[8].strip(),
+            '车辆属性': match_data[11].strip(),
+            '城市': city,
+            '行驶里程': mileage
+        }
+    except Exception as e:
+        print(f"Error in parse_cheyipai_line: {e}")
+        return None
+
+
+def calculate_years(eval_year, eval_month, reg_year, reg_month):
     """计算使用年限，精确到月"""
     if None in (eval_year, eval_month, reg_year, reg_month):
         return None
@@ -438,11 +567,21 @@ def main():
     # 输入文件
     youliang_file = script_dir / 'output' / 'youliang_match_result.txt'
     youxinpai_file = script_dir / 'output' / 'youxinpai_match_result.txt'
+    cheyipai_file = script_dir / 'output' / 'cheyipai_match_result.txt'
     
     # 输出文件
     output_file = script_dir / 'output' / 'residual_value_data.csv'
     
     all_results = []
+    
+    # 处理车易拍数据
+    if cheyipai_file.exists():
+        print(f"处理车易拍数据: {cheyipai_file}")
+        results = process_file(str(cheyipai_file), parse_cheyipai_line)
+        print(f"  提取有效记录: {len(results)} 条")
+        all_results.extend(results)
+    else:
+        print(f"文件不存在: {cheyipai_file}")
     
     # 处理有辆数据
     if youliang_file.exists():

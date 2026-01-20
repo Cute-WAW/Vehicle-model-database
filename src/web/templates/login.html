@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户登录 - 车型库映射系统</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .login-header h1 {
+            color: #333;
+            margin: 0;
+            font-size: 24px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box; /* Ensure padding doesn't affect width */
+        }
+        .form-group input:focus {
+            border-color: #4CAF50;
+            outline: none;
+        }
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn-login:hover {
+            background-color: #45a049;
+        }
+        .message {
+            margin-top: 15px;
+            text-align: center;
+            color: #d9534f;
+            font-size: 14px;
+            min-height: 20px;
+        }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>用户登录</h1>
+        </div>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">用户名 / 邮箱</label>
+                <input type="text" id="username" name="username" required placeholder="请输入用户名" value="admin">
+            </div>
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password" required placeholder="请输入密码" value="password123">
+            </div>
+            <div style="font-size: 12px; color: #666; margin-bottom: 15px; background: #eee; padding: 8px; border-radius: 4px;">
+                提示：由于网络原因无法连接数据库时，请使用默认测试账号：<br>
+                <b>admin</b> / <b>password123</b> (离线模式)
+            </div>
+            <button type="submit" class="btn-login" id="loginBtn">登录</button>
+            <div class="message" id="message"></div>
+        </form>
+        <div class="footer">
+            还没有账号？ <a href="/register" style="color: #4CAF50; text-decoration: none;">立即注册</a>
+            <br><br>
+            &copy; 2024 车型库映射系统
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const messageEl = document.getElementById('message');
+            const btn = document.getElementById('loginBtn');
+
+            // Reset message
+            messageEl.textContent = '';
+            btn.disabled = true;
+            btn.textContent = '登录中...';
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    messageEl.style.color = '#4CAF50';
+                    messageEl.textContent = '登录成功！正在跳转...';
+                    // Store token if needed
+                    if (data.token) {
+                        localStorage.setItem('token', data.token);
+                    }
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
+                } else {
+                    messageEl.style.color = '#d9534f';
+                    messageEl.textContent = data.message || '登录失败，请检查用户名和密码';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                messageEl.style.color = '#d9534f';
+                messageEl.textContent = '服务器连接错误，请稍后重试';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '登录';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -47,6 +47,7 @@ class ResidualRecord:
     vehicle_attr: str  # 车辆属性
     city: str
     mileage: float
+    source: str = "unknown"  # 数据来源
     entities: Optional[Dict] = None
 
 
@@ -192,7 +193,8 @@ class ResidualDataIndex:
                 vehicle_size=str(row.get('车辆小类', '')),
                 vehicle_attr=str(row.get('车辆属性', '')),
                 city=str(row.get('城市', '')),
-                mileage=float(row.get('行驶里程', 0)) if pd.notna(row.get('行驶里程')) else 0
+                mileage=float(row.get('行驶里程', 0)) if pd.notna(row.get('行驶里程')) else 0,
+                source=str(row.get('数据来源', 'unknown'))
             )
             
             # 提取实体特征
@@ -501,15 +503,36 @@ if __name__ == '__main__':
     import os
     os.chdir(Path(__file__).parent.parent)
     
+    # 路径配置
+    csv_path = 'output/batch_modeling_results.csv'
+    index_path = 'index/residual_data_index.pkl'
+    
+    if not os.path.exists(csv_path):
+        print(f"数据文件不存在: {csv_path}")
+        exit(1)
+        
+    # 初始化并构建索引
     index = ResidualDataIndex()
-    index.build_from_csv('output/residual_value_data.csv')
+    # 强制重建索引以确保使用最新数据
+    index.build_from_csv(csv_path, index_path=index_path, force_rebuild=True)
     
-    # 测试检索
-    test_name = '起亚 K3 2013款 1.6 手自一体 GLS'
-    test_series = '起亚-K3'
+    print(f"\n索引构建完成: {index_path}")
+    print(f"包含记录数: {len(index.records)}")
     
-    similar = index.search_similar(test_name, test_series, years=11.67, top_k=5)
-    print(f"\n相近车辆 ({len(similar)}):")
-    for s in similar:
-        print(f"  分数={s.score:.0f}, 车辆={s.record.vehicle_full_name}")
-        print(f"    成交价={s.record.used_price}万, 年限={s.record.years}, 匹配={s.matched_features}")
+    # 获取第一条有效记录进行测试
+    if index.records:
+        test_record = index.records[0]
+        test_name = test_record.vehicle_full_name
+        test_series = test_record.brand_series
+        test_years = test_record.years
+        
+        print(f"\n测试检索功能:")
+        print(f"查询: {test_name} ({test_series}, {test_years}年)")
+        
+        similar = index.search_similar(test_name, test_series, years=test_years, top_k=5)
+        print(f"找到 {len(similar)} 个相近车辆:")
+        for s in similar:
+            print(f"  分数={s.score:.0f}, 车辆={s.record.vehicle_full_name}")
+            print(f"    成交价={s.record.used_price}万, 年限={s.record.years:.1f}年, 匹配={s.matched_features}")
+    else:
+        print("警告: 索引中没有记录，无法测试检索功能")

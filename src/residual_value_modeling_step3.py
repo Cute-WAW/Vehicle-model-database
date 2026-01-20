@@ -117,26 +117,26 @@ def load_and_clean_data(file_path, brand_series, iqr_factor=1.0):
     """加载并清洗数据"""
     if not Path(file_path).exists():
         print(f"Error: File not found: {file_path}")
-        sys.exit(1)
+        return None
 
     try:
         df = pd.read_csv(file_path)
     except Exception as e:
         print(f"Error reading CSV: {e}")
-        sys.exit(1)
+        return None
         
     # 筛选品牌车系
     df_series = df[df['品牌车系'] == brand_series].copy()
     if len(df_series) < 10:
         print(f"Error: 样本数据不足 (仅 {len(df_series)} 条)，无法建模。")
-        sys.exit(0)
+        return None
 
     # 必要的列检查
     required_cols = ['车况校正价', '新车的价格', '使用年限']
     for col in required_cols:
         if col not in df_series.columns:
             print(f"Error: 缺少必要列: {col}")
-            sys.exit(1)
+            return None
 
     # 数据转换
     df_series['使用年限'] = pd.to_numeric(df_series['使用年限'], errors='coerce')
@@ -157,7 +157,7 @@ def load_and_clean_data(file_path, brand_series, iqr_factor=1.0):
 
     if len(df_pre_clean) < 5:
         print(f"Error: 清洗后有效样本过少 ({len(df_pre_clean)} 条)，建议检查数据质量。")
-        sys.exit(0)
+        return None
 
     print(f"[{brand_series}] 原始样本: {len(df_series)} 条")
     

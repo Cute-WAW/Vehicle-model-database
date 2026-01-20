@@ -16,6 +16,9 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional
 import uvicorn
+import pandas as pd
+import numpy as np
+import math
 
 from src.entity_extractor import EntityExtractor
 from src.vehicle_index import VehicleIndex
@@ -92,6 +95,98 @@ async def index(request: Request):
     """主页"""
     return templates.TemplateResponse("index.html", {"request": request})
 
+
+@app.get("/analysis", response_class=HTMLResponse)
+async def analysis_page(request: Request):
+    """分析报告页面"""
+    return templates.TemplateResponse("analysis.html", {"request": request})
+
+@app.get("/api/analysis/report")
+async def get_analysis_report():
+    """获取分析报告数据"""
+    csv_path = project_root / 'output' / 'batch_modeling_results.csv'
+    
+    if not csv_path.exists():
+        return {"error": "数据文件不存在"}
+    
+    try:
+        df = pd.read_csv(csv_path)
+        
+        # 强制转换数值列，处理类似 '0+.39' 的脏数据
+        numeric_cols = ['误差率', '误差', '使用年限', '二手车的成交价', '新车的价格', '行驶里程', '预测值']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        df['abs_error_pct'] = df['误差率'].abs()
+        
+        # 辅助函数：安全浮点数转换（处理 NaN/Inf）
+        def safe_float(val):
+            if pd.isna(val) or np.isinf(val):
+                return 0.0
+            return float(val)
+
+        # 1. 核心指标
+        summary = {
+            "total": int(len(df)),
+            "mape": safe_float(df['abs_error_pct'].mean()),
+            "acc_20": safe_float((df['abs_error_pct'] <= 0.20).mean()),
+            "avg_bias": safe_float(df['误差'].mean())
+        }
+        
+        # 2. 品牌分析 (Top 10)
+        brand_stats = df.groupby('品牌车系').agg({
+            '车辆全称': 'count',
+            'abs_error_pct': 'mean'
+        }).reset_index()
+        brand_stats.columns = ['name', 'count', 'mape']
+        top_brands = brand_stats[brand_stats['count'] >= 5].sort_values('count', ascending=False).head(10)
+        
+        # 处理品牌数据中的 NaN
+        brands_data = []
+        for _, row in top_brands.iterrows():
+            brands_data.append({
+                "name": str(row['name']),
+                "count": int(row['count']),
+                "mape": safe_float(row['mape'])
+            })
+        
+        # 3. 车龄曲线
+        df['age_group'] = pd.cut(df['使用年限'], bins=[0, 1, 3, 5, 8, 10, 20], labels=['0-1年', '1-3年', '3-5年', '5-8年', '8-10年', '10年以上'])
+        
+        df['保值率'] = df['二手车的成交价'] / df['新车的价格']
+        # 过滤掉无效的保值率
+        df_valid_rate = df[np.isfinite(df['保值率'])]
+        
+        age_stats = df_valid_rate.groupby('age_group', observed=True).agg({'保值率': 'mean'}).reset_index()
+        age_curve = [{"group": str(row['age_group']), "rate": safe_float(row['保值率'])} for _, row in age_stats.iterrows() if pd.notna(row['保值率'])]
+        
+        # 4. 异常案例
+        anomalies = df.sort_values('abs_error_pct', ascending=False).head(5)
+        anomalies_data = []
+        for _, row in anomalies.iterrows():
+            anomalies_data.append({
+                "name": str(row['车辆全称']),
+                "year": safe_float(row['使用年限']),
+                "mileage": safe_float(row['行驶里程']) if '行驶里程' in row else 0.0,
+                "city": str(row['城市']) if '城市' in row and pd.notna(row['城市']) else "未知",
+                "actual": safe_float(row['二手车的成交价']),
+                "pred": safe_float(row['预测值']),
+                "error_pct": safe_float(row['abs_error_pct']),
+                "bias": safe_float(row['误差'])
+            })
+            
+        return {
+            "summary": summary,
+            "brands": brands_data,
+            "age_curve": age_curve,
+            "anomalies": anomalies_data
+        }
+    except Exception as e:
+        print(f"Error analyzing report: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
 
 @app.post("/api/match")
 async def match(request: MatchRequest):
