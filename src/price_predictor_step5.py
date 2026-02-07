@@ -90,13 +90,13 @@ class PricePredictor:
         script_dir = Path(__file__).parent
         
         self.brand_series_model_dir = Path(brand_series_model_dir) if brand_series_model_dir else \
-            script_dir / '..' / 'price_model' / 'brand_series_model'
+            script_dir / '..' / 'output' / 'brand_series_models'
         
         self.car_types_model_dir = Path(car_types_model_dir) if car_types_model_dir else \
-            script_dir / '..' / 'price_model' / 'car_types_model'
+            script_dir / '..' / 'output' / 'car_types_models'
         
         self.segmented_model_dir = Path(segmented_model_dir) if segmented_model_dir else \
-            script_dir / '..' / 'price_model' / 'segmented_model'
+            script_dir / '..' / 'output' / 'segmented_models'
         
         # 模型缓存
         self._brand_series_cache: Dict[str, ResidualValueModel] = {}

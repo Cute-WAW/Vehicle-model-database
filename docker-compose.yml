@@ -1,0 +1,19 @@
+services:
+  web:
+    build: .
+    container_name: car_price_predictor
+    ports:
+      - "8087:8087"
+    volumes:
+      # 挂载 output 目录以便持久化数据或查看日志 (如果需要)
+      - ./output:/app/output
+      # 挂载 SQLite 数据库文件 (如果使用本地 SQLite)
+      - ./users.sqlite:/app/users.sqlite
+      # 挂载源代码以便热更新
+      - ./src:/app/src
+    environment:
+      # 在这里配置环境变量
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    restart: unless-stopped

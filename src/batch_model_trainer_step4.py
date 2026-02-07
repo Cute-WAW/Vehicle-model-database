@@ -387,37 +387,95 @@ def safe_filename(name: str) -> str:
         result = result.replace(char, '_')
     return result
 
-
-if __name__ == '__main__':
-    # 使用 batch_modeling_results.csv 进行测试分析
-    data_path = '../output/batch_modeling_results.csv'
-    print(f"正在加载数据: {data_path}")
+def main():
+    import argparse
+    import sys
     
-    # 初始化训练器 (min_samples=40 以覆盖更多车系)
-    trainer = BatchModelTrainer(data_path, min_samples=40)
+    parser = argparse.ArgumentParser(description='批量残值率模型训练工具')
+    parser.add_argument('--file', required=True, help='输入数据文件路径 (CSV)')
+    parser.add_argument('--output_dir', default='../output/models', help='模型保存目录')
+    parser.add_argument('--min_samples', type=int, default=20, help='最小样本数阈值')
+    parser.add_argument('--iqr_factor', type=float, default=1.0, help='IQR异常值过滤系数')
+    
+    args = parser.parse_args()
+    
+    input_path = Path(args.file)
+    if not input_path.exists():
+        # Try relative to src if not found
+        base_dir = Path(__file__).parent
+        input_path = base_dir / args.file
+        
+    if not input_path.exists():
+        print(f"Error: 文件不存在: {args.file}")
+        return
+
+    print(f"正在加载数据: {input_path}")
+    
+    # 初始化训练器
+    trainer = BatchModelTrainer(str(input_path), min_samples=args.min_samples, iqr_factor=args.iqr_factor)
+    
+    # 准备输出目录
+    output_dir = Path(args.output_dir)
+    if not output_dir.is_absolute():
+         output_dir = Path(__file__).parent / args.output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     # 获取所有符合条件的分组
     groups = trainer.get_brand_series_groups()
-    print(f"找到 {len(groups)} 个有效品牌车系: {list(groups.keys())}")
+    print(f"找到 {len(groups)} 个有效品牌车系（样本数>={args.min_samples}）")
+    
+    summary_data = []
     
     # 遍历每个车系进行建模分析
     for series_name in groups:
-        print(f"\n{'='*40}")
-        print(f"分析车系: {series_name}")
-        
         # 训练模型
         model, df_clean = trainer.train_for_group(groups[series_name], series_name)
         
+        status = "失败"
+        r2 = 0.0
+        rmse = 0.0
+        formula = ""
+        model_type = ""
+        sample_count = len(groups[series_name])
+        valid_count = len(df_clean)
+        
         if model:
-            print(f"建模结果: 成功")
-            print(f"  - 模型类型: {model.model_type}")
-            print(f"  - 拟合公式: {model.get_formula()}")
-            print(f"  - 拟合优度 (R²): {model.r2:.4f}")
-            print(f"  - 有效样本: {model.sample_count} (原始: {len(groups[series_name])})")
+            status = "成功"
+            r2 = model.r2
+            rmse = model.rmse
+            formula = model.get_formula()
+            model_type = model.model_type
             
-            print(f"  - 典型年份残值率预测:")
-            for year in [1, 3, 5, 8, 10]:
-                rate = model.predict(year)
-                print(f"    第{year:<2}年: {rate:.1%}")
-        else:
-            print(f"建模结果: 失败 (数据分布可能不满足建模要求)")
+            # 保存模型
+            safe_name = safe_filename(series_name)
+            model_path = output_dir / f"{safe_name}.pkl"
+            model.save(str(model_path))
+            
+        summary_data.append({
+            '品牌车系': series_name,
+            '状态': status,
+            '原始样本': sample_count,
+            '有效样本': valid_count,
+            '模型类型': model_type,
+            'R2': round(r2, 4),
+            'RMSE': round(rmse, 4),
+            '公式': formula
+        })
+
+    # 保存汇总报表
+    summary_df = pd.DataFrame(summary_data)
+    summary_path = output_dir / "batch_training_summary.csv"
+    summary_df.to_csv(summary_path, index=False, encoding='utf-8-sig')
+    print(f"\n批量训练完成！")
+    print(f"模型已保存至: {output_dir}")
+    print(f"汇总报表已保存至: {summary_path}")
+    
+    # 打印简要统计
+    success_count = summary_df[summary_df['状态'] == '成功'].shape[0]
+    print(f"成功建模: {success_count}/{len(groups)}")
+    if success_count > 0:
+        avg_r2 = summary_df[summary_df['状态'] == '成功']['R2'].mean()
+        print(f"平均 R2: {avg_r2:.4f}")
+
+if __name__ == '__main__':
+    main()

@@ -162,8 +162,31 @@ def main():
     
     # 处理相对路径
     script_dir = Path(__file__).parent
-    data_path = args.data if Path(args.data).is_absolute() else str(script_dir / args.data)
-    output_dir = args.output if Path(args.output).is_absolute() else str(script_dir / args.output)
+    
+    # Resolve data path
+    p_data = Path(args.data)
+    if not p_data.is_absolute():
+        if p_data.exists():
+            data_path = str(p_data)
+        else:
+            # Try relative to script dir (e.g. for defaults with ..)
+            p_script_rel = script_dir / args.data
+            if p_script_rel.exists():
+                data_path = str(p_script_rel)
+            else:
+                data_path = args.data
+    else:
+        data_path = args.data
+
+    # Resolve output path
+    p_out = Path(args.output)
+    if not p_out.is_absolute():
+        if args.output.startswith('..'):
+             output_dir = str(script_dir / args.output)
+        else:
+             output_dir = args.output
+    else:
+        output_dir = args.output
     
     # 检查数据文件
     if not Path(data_path).exists():

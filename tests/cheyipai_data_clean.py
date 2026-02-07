@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-df = pd.read_csv("D:\software\cheyipai_data.csv",encoding='gbk')
+df = pd.read_csv("D:\software\cheyipai_more_car.csv",encoding='gbk')
 
 # print(df.head())
 # 删除无用列 df.drop(columns="Unnamed: 0",inplace=True)
@@ -64,4 +64,4 @@ df['上牌时间'] = df['上牌时间'].replace('-',np.nan).replace(' ',np.nan)
 df.dropna(subset=['上牌时间'], inplace=True)
 
 # 完成清洗并保存
-df.to_csv("cheyipai_data_clean.csv",index=False,encoding='gbk')
+df.to_csv("cheyipai_more_data_clean.csv",index=False,encoding='gbk')

@@ -132,7 +132,10 @@ def batch_match(input_file: str, output_file: str, limit: int = None, column: st
     
     # 读取输入数据
     print(f"\n读取输入数据: {input_file}")
-    df = pd.read_csv(input_file)
+    try:
+        df = pd.read_csv(input_file)
+    except UnicodeDecodeError:
+        df = pd.read_csv(input_file, encoding='gbk')
     
     # 确定车辆列名
     if column:

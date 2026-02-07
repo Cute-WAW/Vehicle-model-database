@@ -47,6 +47,7 @@ class ResidualRecord:
     vehicle_attr: str  # 车辆属性
     city: str
     mileage: float
+    transaction_date: str = "" # 交易时间
     source: str = "unknown"  # 数据来源
     entities: Optional[Dict] = None
 
@@ -81,6 +82,7 @@ class ResidualDataIndex:
         # 索引结构
         self.records: List[ResidualRecord] = []
         self.brand_series_index: Dict[str, List[int]] = {}  # 品牌车系 -> 记录索引列表
+        self.brand_index: Dict[str, List[int]] = {}  # 品牌 -> 记录索引列表 (新增，用于降级搜索)
         self.vehicle_type_index: Dict[str, List[int]] = {}  # 车辆类别 -> 记录索引列表
         
         # 原始 DataFrame 引用
@@ -148,6 +150,12 @@ class ResidualDataIndex:
             self.records = data['records']
             self.brand_series_index = data['brand_series_index']
             self.vehicle_type_index = data['vehicle_type_index']
+            self.brand_index = data.get('brand_index', {}) # 兼容旧缓存
+            
+            if not self.brand_index:
+                logger.info("索引缓存缺少 brand_index，需要重建")
+                return False
+
             self._csv_mtime = cached_mtime
             
             logger.info(f"从缓存加载索引: {index_path}")
@@ -176,6 +184,7 @@ class ResidualDataIndex:
         
         self.records = []
         self.brand_series_index = {}
+        self.brand_index = {}
         self.vehicle_type_index = {}
         
         for idx, row in self._df.iterrows():
@@ -194,6 +203,7 @@ class ResidualDataIndex:
                 vehicle_attr=str(row.get('车辆属性', '')),
                 city=str(row.get('城市', '')),
                 mileage=float(row.get('行驶里程', 0)) if pd.notna(row.get('行驶里程')) else 0,
+                transaction_date=str(row.get('交易时间', row.get('trade_date', ''))) if pd.notna(row.get('交易时间', row.get('trade_date', ''))) else '',
                 source=str(row.get('数据来源', 'unknown'))
             )
             
@@ -210,6 +220,15 @@ class ResidualDataIndex:
                 if record.brand_series not in self.brand_series_index:
                     self.brand_series_index[record.brand_series] = []
                 self.brand_series_index[record.brand_series].append(record_idx)
+                
+                # 品牌索引 (从 brand_series 提取品牌)
+                # 假设格式为 "Brand-Series"
+                parts = record.brand_series.split('-')
+                if parts:
+                    brand = parts[0]
+                    if brand not in self.brand_index:
+                        self.brand_index[brand] = []
+                    self.brand_index[brand].append(record_idx)
             
             # 车辆类别索引 (大类-小类-属性)
             car_type = f"{record.vehicle_type}-{record.vehicle_size}-{record.vehicle_attr}"
@@ -329,9 +348,21 @@ class ResidualDataIndex:
         if self.entity_extractor:
             query_entities = self.entity_extractor.extract(vehicle_full_name)
         
-        # 优先从同品牌车系中检索
+        # 确定检索范围
+        search_indices = []
         if brand_series in self.brand_series_index:
-            for record_idx in self.brand_series_index[brand_series]:
+            search_indices = self.brand_series_index[brand_series]
+        else:
+            # 降级：尝试同品牌检索
+            parts = brand_series.split('-')
+            if parts:
+                brand = parts[0]
+                if brand in self.brand_index:
+                    search_indices = self.brand_index[brand]
+                    logger.warning(f"未找到车系 {brand_series}，降级为品牌 {brand} 检索 (候选数: {len(search_indices)})")
+
+        if search_indices:
+            for record_idx in search_indices:
                 record = self.records[record_idx]
                 
                 # 排除完全相同
@@ -479,6 +510,7 @@ class ResidualDataIndex:
         data = {
             'records': self.records,
             'brand_series_index': self.brand_series_index,
+            'brand_index': self.brand_index,
             'vehicle_type_index': self.vehicle_type_index,
             'csv_mtime': getattr(self, '_csv_mtime', 0)
         }
@@ -493,6 +525,7 @@ class ResidualDataIndex:
             data = pickle.load(f)
         self.records = data['records']
         self.brand_series_index = data['brand_series_index']
+        self.brand_index = data.get('brand_index', {})
         self.vehicle_type_index = data['vehicle_type_index']
         self._csv_mtime = data.get('csv_mtime', 0)
         logger.info(f"索引已加载，共 {len(self.records)} 条记录")
@@ -504,7 +537,7 @@ if __name__ == '__main__':
     os.chdir(Path(__file__).parent.parent)
     
     # 路径配置
-    csv_path = 'output/batch_modeling_results.csv'
+    csv_path = 'output/cheyipai_more_residual_value.csv'
     index_path = 'index/residual_data_index.pkl'
     
     if not os.path.exists(csv_path):

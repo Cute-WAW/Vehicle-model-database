@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.DS_Store
+.git
+.gitignore
+.vscode
+.idea
+*.log
+# 如果有不需要打包的大型临时数据文件，可以在这里排除
+# 但注意：模型文件 (*.pkl) 和必要的 CSV 数据文件必须保留

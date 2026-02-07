@@ -38,7 +38,7 @@ class AdjustmentParams:
     """调整参数"""
     method: str = "confidence_dynamic"  # 方案B：置信度动态调整
     adjustment_factor: float = 1.0  # 调整系数（最优值）
-    max_adjustment: float = 0.30  # 最大调整幅度 30%（最优值）
+    max_adjustment: float = 0.05  # 最大调整幅度 5%（最优值，原为0.30）
 
 
 @dataclass
@@ -78,11 +78,18 @@ class PredictionDebugInfo:
 
 import sys
 # 添加 C2B2C 模型路径
-c2b2c_model_path = str(Path(__file__).parent / '..' / 'price_model' / 'c2b2c_model')
-if c2b2c_model_path not in sys.path:
-    sys.path.insert(0, c2b2c_model_path)
-
-from predictor import C2B2CPricePredictor
+try:
+    c2b2c_model_path = str(Path(__file__).parent / '..' / 'price_model' / 'c2b2c_model')
+    if c2b2c_model_path not in sys.path:
+        sys.path.insert(0, c2b2c_model_path)
+    
+    from predictor import C2B2CPricePredictor
+except ImportError:
+    logger.warning("Could not import C2B2CPricePredictor from predictor.py. C2B2C features will be disabled.")
+    C2B2CPricePredictor = None
+except Exception as e:
+    logger.warning(f"Error importing C2B2CPricePredictor: {e}. C2B2C features will be disabled.")
+    C2B2CPricePredictor = None
 
 @dataclass
 class ResidualPredictionResult:
@@ -138,7 +145,22 @@ class ResidualPredictor:
         
         # 初始化成交数据索引
         self.data_index = ResidualDataIndex()
-        csv_path = residual_data_csv or str(script_dir / '..' / 'output' / 'residual_value_data.csv')
+        
+        if residual_data_csv:
+            csv_path = residual_data_csv
+        else:
+            # 优先使用车易拍More数据
+            path_cheyipai = script_dir / '..' / 'output' / 'cheyipai_more_residual_value.csv'
+            path_with_dates = script_dir / '..' / 'output' / 'merged_residual_value_data_with_dates.csv'
+            path_default = script_dir / '..' / 'output' / 'merged_residual_value_data.csv'
+            
+            if path_cheyipai.exists():
+                csv_path = str(path_cheyipai)
+            elif path_with_dates.exists():
+                csv_path = str(path_with_dates)
+            else:
+                csv_path = str(path_default)
+        
         index_cache_path = str(script_dir / '..' / 'index' / 'residual_data_index.pkl')
         if Path(csv_path).exists():
             self.data_index.build_from_csv(csv_path, index_path=index_cache_path)
@@ -196,79 +218,7 @@ class ResidualPredictor:
         debug = PredictionDebugInfo()
         
         try:
-            # ========== Step 1: 确定新车价格 ==========
-            if new_price is None:
-                new_price = self._infer_new_price(brand_series)
-                if new_price is None:
-                    return ResidualPredictionResult(
-                        success=False,
-                        error_message=f"无法确定新车价格，请提供 new_price 参数"
-                    )
-            
-            # ========== Step 2: 模型预测 ==========
-            model_result = self._predict_by_model(brand_series, vehicle_full_name, years, new_price)
-            
-            if not model_result['success']:
-                return ResidualPredictionResult(
-                    success=False,
-                    error_message=model_result['error']
-                )
-            
-            debug.model_used = model_result['model_used']
-            debug.model_name = model_result['model_name']
-            debug.model_type = model_result['model_type']
-            debug.model_r2 = model_result['r2']
-            debug.model_prediction = model_result['predicted_price']
-            
-            model_price = model_result['predicted_price']
-            
-            # ========== Step 2.5: 针对性优化规则调整 (Heuristic Adjustments) ==========
-            # 基于各细分市场基线分析进行的修正 (通过 optimization_analysis.py 发现普遍低估)
-            # 1. 新能源 (NEV): 整体预测偏低, 补偿 3%
-            # 2. 新车 (0-3年): 贬值曲线可能过陡, 补偿 5%
-            # 3. 高价车 (>15万): 贬值率可能偏低, 补偿 5%
-            
-            heuristic_adjustments = []
-            
-            # 新能源
-            if self._is_nev(vehicle_full_name):
-                model_price *= 1.03
-                heuristic_adjustments.append("NEV(+3%)")
-                
-            # 新车 (0-3年)
-            if years <= 3:
-                model_price *= 1.05
-                heuristic_adjustments.append("NewCar(+5%)")
-                
-            # 高价车
-            if model_price > 15.0:
-                model_price *= 1.05
-                heuristic_adjustments.append("HighEnd(+5%)")
-                
-            if heuristic_adjustments:
-                # 更新模型预测值，作为后续调整的基础
-                result_info = "+".join(heuristic_adjustments)
-                logger.info(f"应用规则修正: {vehicle_full_name} -> {result_info}, Price: {model_result['predicted_price']:.2f}->{model_price:.2f}")
-                debug.model_prediction = model_price 
-
-            
-            # ========== Step 3: 查找完全相同的记录 ==========
-            identical = self.data_index.find_identical_records(
-                vehicle_full_name, brand_series, years, grade, city, mileage
-            )
-            identical_records = [
-                {
-                    'vehicle_full_name': r.vehicle_full_name,
-                    'used_price': r.used_price,
-                    'adjusted_price': r.adjusted_price,
-                    'years': r.years,
-                    'city': r.city,
-                    'source': getattr(r, 'source', 'unknown')
-                }
-                for r in identical
-            ]
-            
-            # ========== Step 4: 检索相近车辆 ==========
+            # ========== Step 0: 检索相近车辆 (提前执行以辅助推断) ==========
             similar = self.data_index.search_similar(
                 vehicle_full_name, brand_series, years,
                 grade=grade, city=city, mileage=mileage,
@@ -284,6 +234,7 @@ class ResidualPredictor:
                     'grade': s.record.grade,
                     'city': s.record.city,
                     'mileage': s.record.mileage,
+                    'transaction_date': getattr(s.record, 'transaction_date', ''),
                     'source': getattr(s.record, 'source', 'unknown'),
                     'score': s.score,
                     'matched_features': s.matched_features
@@ -291,22 +242,91 @@ class ResidualPredictor:
                 for s in similar
             ]
             
-            # ========== Step 5: 成交价格微调 ==========
-            # 使用相似车辆进行置信度动态调整（不使用完全相同记录，避免数据泄露）
-            final_price = model_price
+            # ========== Step 1: 确定新车价格 ==========
+            if new_price is None:
+                new_price = self._infer_new_price(brand_series, similar)
+                if new_price is None:
+                    logger.warning(f"无法确定新车价格: {brand_series}, 将仅使用相似车辆数据进行估价")
+            
+            # ========== Step 2: 模型预测 ==========
+            model_price = None
+            if new_price and new_price > 0:
+                model_result = self._predict_by_model(brand_series, vehicle_full_name, years, new_price)
+                
+                if model_result['success']:
+                    debug.model_used = model_result['model_used']
+                    debug.model_name = model_result['model_name']
+                    debug.model_type = model_result['model_type']
+                    debug.model_r2 = model_result['r2']
+                    debug.model_prediction = model_result['predicted_price']
+                    model_price = model_result['predicted_price']
+                else:
+                    logger.warning(f"模型预测失败: {model_result.get('error')}, 将尝试使用相近车辆估价")
+                    debug.model_used = "none"
+                    debug.model_name = "none"
+            else:
+                logger.info("未获取到新车价格，跳过模型预测步骤")
+                debug.model_used = "none"
+                debug.model_name = "none"
+            
+            # ========== Step 2.5: 针对性优化规则调整 (仅当有模型预测值时) ==========
+            if model_price is not None:
+                heuristic_adjustments = []
+                # 新能源
+                if self._is_nev(vehicle_full_name):
+                    model_price *= 1.03
+                    heuristic_adjustments.append("NEV(+3%)")
+                # 新车 (0-3年)
+                if years <= 3:
+                    model_price *= 1.05
+                    heuristic_adjustments.append("NewCar(+5%)")
+                # 高价车
+                if model_price > 15.0:
+                    model_price *= 1.05
+                    heuristic_adjustments.append("HighEnd(+5%)")
+                    
+                if heuristic_adjustments:
+                    result_info = "+".join(heuristic_adjustments)
+                    debug.model_prediction = model_price # 更新显示
+            
+            # ========== Step 3: 查找完全相同的记录 ==========
+            identical = self.data_index.find_identical_records(
+                vehicle_full_name, brand_series, years, grade, city, mileage
+            )
+            
+            # 将完全相同的记录也加入到相似车辆列表中，用于价格计算
+            if identical:
+                for r in identical:
+                    similar.append(SimilarVehicle(
+                        record=r,
+                        score=200.0,  # 给予最高分
+                        matched_features=['identical']
+                    ))
+
+            identical_records = [
+                {
+                    'vehicle_full_name': r.vehicle_full_name,
+                    'used_price': r.used_price,
+                    'adjusted_price': r.adjusted_price,
+                    'years': r.years,
+                    'city': r.city,
+                    'source': getattr(r, 'source', 'unknown')
+                }
+                for r in identical
+            ]
+            
+            # ========== Step 4: 最终价格计算 (结合相近车辆) ==========
+            # (Step 4 原为检索相近车辆，已移至 Step 0)
+            
+            final_price = 0.0
             adjustment_method = "model_only"
             
-            # 置信度动态调整法：基于相似车辆（排除完全相同记录）
             if similar:
                 # 方案B：置信度动态调整法
-                # 对不同评级的成交价进行校正后再计算均价
                 grade_adjustment = {
-                    ('优', '中'): 1.05,
-                    ('优', '差'): 1.10,
-                    ('中', '优'): 0.952,
-                    ('中', '差'): 1.05,
-                    ('差', '优'): 0.909,
-                    ('差', '中'): 0.952,
+                    ('优', '中'): 1.05, ('优', '差'): 1.10,
+                    ('中', '优'): 0.952, ('中', '差'): 1.05,
+                    ('差', '优'): 0.909, ('差', '中'): 0.952,
                 }
                 
                 corrected_prices = []
@@ -320,42 +340,56 @@ class ResidualPredictor:
                 similar_avg = sum(corrected_prices) / len(corrected_prices)
                 debug.similar_avg_price = round(similar_avg, 2)
                 
-                # 计算偏差
-                if model_price > 0:
-                    deviation = (similar_avg - model_price) / model_price
+                if model_price is not None:
+                    # 场景A: 有模型预测值，使用相似车辆进行微调
+                    if model_price > 0:
+                        deviation = (similar_avg - model_price) / model_price
+                    else:
+                        deviation = 0
+                    
+                    avg_score = sum(s.score for s in similar) / len(similar)
+                    max_possible_score = 160
+                    confidence = min(1.0, avg_score / max_possible_score)
+                    
+                    adjustment_factor = self.adjustment_params.adjustment_factor
+                    max_adjustment = self.adjustment_params.max_adjustment
+                    
+                    delta = deviation * confidence * adjustment_factor
+                    delta = max(-max_adjustment, min(max_adjustment, delta))
+                    
+                    final_price = model_price * (1 + delta)
+                    
+                    adjustment_method = "confidence_dynamic"
+                    debug.adjustment_params = {
+                        'deviation': round(deviation, 4),
+                        'confidence': round(confidence, 4),
+                        'delta': round(delta, 4)
+                    }
+                    debug.adjustment_delta = round(final_price - model_price, 2)
+                    
                 else:
-                    deviation = 0
-                
-                # 计算置信度
-                avg_score = sum(s.score for s in similar) / len(similar)
-                max_possible_score = 160
-                confidence = min(1.0, avg_score / max_possible_score)
-                
-                # 计算调整量 δ
-                adjustment_factor = self.adjustment_params.adjustment_factor
-                max_adjustment = self.adjustment_params.max_adjustment
-                
-                delta = deviation * confidence * adjustment_factor
-                delta = max(-max_adjustment, min(max_adjustment, delta))
-                
-                adjusted_price = model_price * (1 + delta)
-                
-                adjustment_method = "confidence_dynamic"
-                debug.adjustment_method = adjustment_method
-                debug.adjustment_params = {
-                    'deviation': round(deviation, 4),
-                    'confidence': round(confidence, 4),
-                    'adjustment_factor': adjustment_factor,
-                    'max_adjustment': max_adjustment,
-                    'delta': round(delta, 4),
-                    'grade_correction_applied': True
-                }
-                debug.adjustment_delta = round(adjusted_price - model_price, 2)
-                
-                final_price = adjusted_price
+                    # 场景B: 无模型预测值，直接使用相似车辆均价
+                    final_price = similar_avg
+                    adjustment_method = "similar_only"
+                    logger.info(f"无模型预测，使用相似车辆均价: {final_price:.2f}")
+            
+            else:
+                # 无相似车辆
+                if model_price is not None:
+                    final_price = model_price
+                else:
+                    return ResidualPredictionResult(
+                        success=False,
+                        error_message="无法预测：无适用模型且无相似车辆数据"
+                    )
+            
+            debug.adjustment_method = adjustment_method
             
             # 计算残值率
-            residual_rate = final_price / new_price if new_price > 0 else 0
+            if new_price and new_price > 0:
+                residual_rate = final_price / new_price
+            else:
+                residual_rate = 0.0
 
             
             # ========== Step 6: 计算 C2B2C 价格矩阵 ==========
@@ -528,28 +562,76 @@ class ResidualPredictor:
             'error': f"无法找到适用的模型: 品牌车系={brand_series}, 车辆类别={car_type}"
         }
     
-    def _infer_new_price(self, brand_series: str) -> Optional[float]:
+    def _infer_new_price(self, brand_series: str, similar_vehicles: List = None) -> Optional[float]:
         """
         从成交数据中推断新车价格
         
         Args:
             brand_series: 品牌-车系
+            similar_vehicles: 相近车辆列表（可选）
             
         Returns:
             新车价格的中位数，如果找不到返回 None
         """
+        # 1. 优先尝试从相近车辆中获取 (更精准)
+        if similar_vehicles:
+            # 过滤无效价格
+            valid_sim = [s for s in similar_vehicles if s.record.new_price > 0]
+            
+            if valid_sim:
+                candidates = []
+                
+                # 策略：分级匹配，优先使用特征完全匹配的车辆
+                
+                # Level 1: 年款 + 排量 + 变速箱 + 版式 (最精准)
+                level1 = [s for s in valid_sim if 
+                          'model_year' in s.matched_features and 
+                          'displacement' in s.matched_features and 
+                          'transmission' in s.matched_features and 
+                          'trim' in s.matched_features]
+                
+                if level1:
+                    candidates = level1
+                else:
+                    # Level 2: 年款 + 排量 + 变速箱 (忽略版式)
+                    level2 = [s for s in valid_sim if 
+                              'model_year' in s.matched_features and 
+                              'displacement' in s.matched_features and 
+                              'transmission' in s.matched_features]
+                    if level2:
+                        candidates = level2
+                    else:
+                        # Level 3: 年款 + 排量 (忽略变速箱)
+                        level3 = [s for s in valid_sim if 
+                                  'model_year' in s.matched_features and 
+                                  'displacement' in s.matched_features]
+                        if level3:
+                            candidates = level3
+                        else:
+                            # Level 4: 仅年款
+                            level4 = [s for s in valid_sim if 'model_year' in s.matched_features]
+                            if level4:
+                                candidates = level4
+                            else:
+                                # Level 5: 使用 Top 5 (兜底)
+                                candidates = valid_sim[:5]
+                
+                # 计算中位数
+                prices = [s.record.new_price for s in candidates]
+                prices.sort()
+                mid = len(prices) // 2
+                return prices[mid]
+
+        # 2. 如果没有相近车辆，再尝试从同车系历史记录中获取 (兜底)
         records = self.data_index.get_records_by_brand_series(brand_series)
-        if not records:
-            return None
+        if records:
+            prices = [r.new_price for r in records if r.new_price > 0]
+            if prices:
+                prices.sort()
+                mid = len(prices) // 2
+                return prices[mid]
         
-        prices = [r.new_price for r in records if r.new_price > 0]
-        if not prices:
-            return None
-        
-        # 返回中位数
-        prices.sort()
-        mid = len(prices) // 2
-        return prices[mid]
+        return None
     
     def get_available_brand_series(self) -> List[str]:
         """获取可用的品牌车系列表"""

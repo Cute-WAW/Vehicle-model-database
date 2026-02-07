@@ -36,7 +36,8 @@ def main():
     args = parser.parse_args()
 
     # 路径配置
-    data_file = project_root / 'output' / 'residual_value_data.csv'
+    # data_file = project_root / 'output' / 'residual_value_data.csv'
+    data_file = project_root / 'output' / 'merged_residual_value_data.csv'
     brand_series_model_dir = project_root / 'price_model' / 'brand_series_model'
     car_types_model_dir = project_root / 'price_model' / 'car_types_model'
     index_file = project_root / 'index' / 'residual_data_index.pkl'

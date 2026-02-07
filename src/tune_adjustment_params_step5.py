@@ -252,7 +252,11 @@ def main():
 """)
     
     # 加载验证集
-    csv_path = 'output/residual_value_data.csv'
+    csv_path = 'output/cheyipai_more_residual_value.csv'
+    if not os.path.exists(csv_path):
+        logger.warning(f"文件不存在: {csv_path}, 尝试使用 merged_residual_value_data.csv")
+        csv_path = 'output/merged_residual_value_data.csv'
+    
     df_val = sample_validation_set(csv_path, n_samples=200)
     
     # 初始化预测器

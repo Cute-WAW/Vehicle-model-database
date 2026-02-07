@@ -5,42 +5,27 @@ from pathlib import Path
 
 def merge_datasets():
     # Define paths
-    original_data_path = Path(r"D:\BaiduNetdiskDownload\residual_value_data_for_build_model.csv")
-    new_data_path = Path(r"D:\BaiduNetdiskDownload\车型库映射\车型库映射\output\residual_value_data_for_build_model.csv")
-    output_path = Path(r"D:\BaiduNetdiskDownload\车型库映射\车型库映射\output\merged_residual_value_data.csv")
+    script_dir = Path(__file__).parent
+    project_root = script_dir.parent
     
-    print(f"Reading original data from: {original_data_path}")
+    # Use the newly generated file from step 2 which now contains ALL data
+    original_data_path = project_root / 'output' / 'residual_value_data.csv'
+    output_path = project_root / 'output' / 'merged_residual_value_data.csv'
+    
+    if not original_data_path.exists():
+        print(f"Error: Data file not found at {original_data_path}")
+        return None
+        
+    print(f"Reading data from: {original_data_path}")
     try:
-        df_original = pd.read_csv(original_data_path, encoding='utf-8-sig')
+        df_merged = pd.read_csv(original_data_path, encoding='utf-8-sig')
     except UnicodeDecodeError:
         print("utf-8-sig failed, trying gbk")
-        df_original = pd.read_csv(original_data_path, encoding='gbk')
+        df_merged = pd.read_csv(original_data_path, encoding='gbk')
         
-    print(f"Original data shape: {df_original.shape}")
+    print(f"Data shape: {df_merged.shape}")
     
-    print(f"Reading new data from: {new_data_path}")
-    try:
-        df_new = pd.read_csv(new_data_path, encoding='utf-8-sig')
-    except UnicodeDecodeError:
-        print("utf-8-sig failed, trying gbk")
-        df_new = pd.read_csv(new_data_path, encoding='gbk')
-        
-    print(f"New data shape: {df_new.shape}")
-    
-    # Identify common columns
-    common_cols = list(set(df_original.columns) & set(df_new.columns))
-    print(f"Common columns count: {len(common_cols)}")
-    
-    # We want to keep all columns from original data, and append new data
-    # If new data has extra columns (like prediction results), we can keep them or drop them.
-    # For model building, we mainly need the input features.
-    # Let's align to the union of columns to preserve information
-    
-    df_merged = pd.concat([df_original, df_new], axis=0, ignore_index=True)
-    
-    print(f"Merged data shape: {df_merged.shape}")
-    
-    # Fill '数据来源' if missing (assuming original is '有辆' if not specified, but let's check)
+    # Fill '数据来源' if missing
     if '数据来源' in df_merged.columns:
         print("Value counts for '数据来源':")
         print(df_merged['数据来源'].value_counts(dropna=False))

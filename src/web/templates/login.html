@@ -1,159 +1,228 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>用户登录 - 车型库映射系统</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background-color: #f5f5f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 400px;
-        }
-        .login-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .login-header h1 {
-            color: #333;
-            margin: 0;
-            font-size: 24px;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #555;
-            font-weight: 500;
-        }
-        .form-group input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
-            box-sizing: border-box; /* Ensure padding doesn't affect width */
-        }
-        .form-group input:focus {
-            border-color: #4CAF50;
-            outline: none;
-        }
-        .btn-login {
-            width: 100%;
-            padding: 12px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .btn-login:hover {
-            background-color: #45a049;
-        }
-        .message {
-            margin-top: 15px;
-            text-align: center;
-            color: #d9534f;
-            font-size: 14px;
-            min-height: 20px;
-        }
-        .footer {
-            margin-top: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #888;
-        }
-    </style>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=3">
 </head>
-<body>
+<body class="auth-page">
+    <!-- Animated Background Shapes -->
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    <div class="bg-shape shape-3"></div>
+
     <div class="login-container">
         <div class="login-header">
-            <h1>用户登录</h1>
+            <div class="logo-icon">
+                <i class="fas fa-car-side"></i>
+            </div>
+            <h1>欢迎回来</h1>
+            <p>登录您的车型库映射系统账号</p>
         </div>
-        <form id="loginForm">
-            <div class="form-group">
+        
+        <form id="loginForm" novalidate>
+            <div class="form-group" id="usernameGroup">
                 <label for="username">用户名 / 邮箱</label>
-                <input type="text" id="username" name="username" required placeholder="请输入用户名" value="admin">
+                <div class="input-wrapper">
+                    <input type="text" id="username" name="username" required placeholder="请输入用户名">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="error-message">请输入用户名</div>
             </div>
-            <div class="form-group">
+            
+            <div class="form-group" id="passwordGroup">
                 <label for="password">密码</label>
-                <input type="password" id="password" name="password" required placeholder="请输入密码" value="password123">
+                <div class="input-wrapper">
+                    <input type="password" id="password" name="password" required placeholder="请输入密码">
+                    <i class="fas fa-lock"></i>
+                </div>
+                <div class="error-message">请输入密码</div>
             </div>
-            <div style="font-size: 12px; color: #666; margin-bottom: 15px; background: #eee; padding: 8px; border-radius: 4px;">
-                提示：由于网络原因无法连接数据库时，请使用默认测试账号：<br>
+            
+            <div class="form-group" id="captchaGroup">
+                <label for="captcha">验证码</label>
+                <div class="captcha-wrapper" style="display: flex; gap: 10px; align-items: center;">
+                    <div class="input-wrapper" style="flex: 1;">
+                        <input type="text" id="captcha" name="captcha" required placeholder="请输入验证码" maxlength="4">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="captcha-image" style="cursor: pointer; height: 44px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1);" title="点击刷新验证码">
+                        <img id="captchaImg" src="" alt="验证码" style="height: 100%; display: block; min-width: 120px; background: #eee;">
+                    </div>
+                </div>
+                <div class="error-message">请输入验证码</div>
+            </div>
+            
+            <div class="form-options">
+                <label class="remember-me">
+                    <input type="checkbox" id="rememberMe"> 记住我
+                </label>
+                <a href="#" onclick="alert('请联系管理员重置密码'); return false;" class="forgot-password">忘记密码?</a>
+            </div>
+
+            <button type="submit" class="btn-full" id="loginBtn">
+                <span>立即登录</span>
+                <div class="btn-spinner"></div>
+            </button>
+            
+            <div class="message" id="message"></div>
+            
+            <div class="debug-info">
+                <i class="fas fa-info-circle"></i> 提示：如无法连接数据库，请使用测试账号：<br>
                 <b>admin</b> / <b>password123</b> (离线模式)
             </div>
-            <button type="submit" class="btn-login" id="loginBtn">登录</button>
-            <div class="message" id="message"></div>
         </form>
-        <div class="footer">
-            还没有账号？ <a href="/register" style="color: #4CAF50; text-decoration: none;">立即注册</a>
+        
+        <div class="form-footer">
+            还没有账号？ <a href="/register">立即注册</a>
             <br><br>
-            &copy; 2024 车型库映射系统
+            <span style="font-size: 12px; color: #999;">&copy; 2026 车型库映射系统</span>
         </div>
     </div>
 
     <script>
+        let currentCaptchaId = '';
+
+        // Load Captcha
+        async function loadCaptcha() {
+            try {
+                const img = document.getElementById('captchaImg');
+                // Optional: add loading state to image
+                img.style.opacity = '0.5';
+                
+                const response = await fetch('/api/auth/captcha');
+                const data = await response.json();
+                
+                currentCaptchaId = data.captcha_id;
+                img.src = 'data:image/png;base64,' + data.image;
+                
+                img.style.opacity = '1';
+                
+                // Clear input
+                document.getElementById('captcha').value = '';
+            } catch (error) {
+                console.error('Failed to load captcha:', error);
+            }
+        }
+
+        // Check local storage for remembered user
+        document.addEventListener('DOMContentLoaded', () => {
+            const rememberedUser = localStorage.getItem('rememberedUser');
+            if (rememberedUser) {
+                document.getElementById('username').value = rememberedUser;
+                document.getElementById('rememberMe').checked = true;
+            }
+            loadCaptcha();
+        });
+        
+        // Refresh captcha on click
+        document.querySelector('.captcha-image').addEventListener('click', loadCaptcha);
+
+        // Input validation helper
+        function validateInput(input, group) {
+            if (!input.value.trim()) {
+                group.classList.add('error');
+                return false;
+            } else {
+                group.classList.remove('error');
+                return true;
+            }
+        }
+
+        // Real-time validation
+        document.getElementById('username').addEventListener('input', function() {
+            validateInput(this, document.getElementById('usernameGroup'));
+        });
+        document.getElementById('password').addEventListener('input', function() {
+            validateInput(this, document.getElementById('passwordGroup'));
+        });
+        document.getElementById('captcha').addEventListener('input', function() {
+            validateInput(this, document.getElementById('captchaGroup'));
+        });
+
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
+            
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const captchaInput = document.getElementById('captcha');
+            
+            const usernameGroup = document.getElementById('usernameGroup');
+            const passwordGroup = document.getElementById('passwordGroup');
+            const captchaGroup = document.getElementById('captchaGroup');
+            
+            // Validate all
+            const isUsernameValid = validateInput(usernameInput, usernameGroup);
+            const isPasswordValid = validateInput(passwordInput, passwordGroup);
+            const isCaptchaValid = validateInput(captchaInput, captchaGroup);
+            
+            if (!isUsernameValid || !isPasswordValid || !isCaptchaValid) return;
+
+            const username = usernameInput.value;
+            const password = passwordInput.value;
+            const captcha_code = captchaInput.value;
+            const rememberMe = document.getElementById('rememberMe').checked;
             const messageEl = document.getElementById('message');
             const btn = document.getElementById('loginBtn');
 
-            // Reset message
+            // Reset UI
             messageEl.textContent = '';
+            messageEl.className = 'message';
+            btn.classList.add('loading');
             btn.disabled = true;
-            btn.textContent = '登录中...';
 
             try {
-                const response = await fetch('/api/auth/login', {
+                // Minimum loading time for better UX
+                const minLoadTime = new Promise(resolve => setTimeout(resolve, 800));
+                
+                const loginRequest = fetch('/api/auth/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify({ 
+                        username, 
+                        password,
+                        captcha_id: currentCaptchaId,
+                        captcha_code: captcha_code
+                    })
                 });
 
+                const [response] = await Promise.all([loginRequest, minLoadTime]);
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    messageEl.style.color = '#4CAF50';
                     messageEl.textContent = '登录成功！正在跳转...';
-                    // Store token if needed
-                    if (data.token) {
-                        localStorage.setItem('token', data.token);
+                    messageEl.classList.add('success', 'show');
+                    
+                    // Handle Remember Me
+                    if (rememberMe) {
+                        localStorage.setItem('rememberedUser', username);
+                    } else {
+                        localStorage.removeItem('rememberedUser');
                     }
+                    
                     setTimeout(() => {
                         window.location.href = '/';
-                    }, 1000);
+                    }, 800);
                 } else {
-                    messageEl.style.color = '#d9534f';
                     messageEl.textContent = data.message || '登录失败，请检查用户名和密码';
+                    messageEl.classList.add('error', 'show');
+                    btn.classList.remove('loading');
+                    btn.disabled = false;
+                    
+                    // Refresh captcha on failure
+                    loadCaptcha();
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                messageEl.style.color = '#d9534f';
                 messageEl.textContent = '服务器连接错误，请稍后重试';
-            } finally {
+                messageEl.classList.add('error', 'show');
+                btn.classList.remove('loading');
                 btn.disabled = false;
-                btn.textContent = '登录';
             }
         });
     </script>

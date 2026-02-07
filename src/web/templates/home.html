@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>二手车残值预测 - 车型库映射系统</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=3">
+    <style>
+        /* Searchable Select Styles */
+        .searchable-select {
+            position: relative;
+            width: 100%;
+        }
+        .searchable-select input {
+            width: 100%;
+            padding: 12px 35px 12px 15px; /* Right padding for icon */
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            transition: all 0.3s;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .searchable-select input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .select-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            pointer-events: none;
+        }
+        .options-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-top: 5px;
+            display: none;
+        }
+        .option-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .option-item:hover {
+            background: #f8f9fa;
+        }
+        .option-empty {
+            padding: 15px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        /* Compatibility styles for existing JS output */
+        .section {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.5);
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .section h3 {
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        .price { 
+            font-size: 28px; 
+            color: var(--success); 
+            font-weight: bold; 
+            text-shadow: 0 2px 4px rgba(46, 213, 115, 0.2);
+        }
+
+        .debug-item { 
+            margin: 8px 0; 
+            padding: 10px; 
+            background: rgba(255,255,255,0.5); 
+            border-left: 4px solid var(--primary-color); 
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .similar-vehicle { 
+            padding: 15px; 
+            margin: 10px 0; 
+            background: rgba(255,255,255,0.8); 
+            border: 1px solid var(--border); 
+            border-radius: 12px;
+            transition: transform 0.2s;
+        }
+        .similar-vehicle:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+
+        /* Form Layout */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .form-full {
+            grid-column: 1 / -1;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .form-group input, .form-group select {
+            padding: 12px 15px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            transition: all 0.3s;
+            font-size: 14px;
+            width: 100%;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .btn-predict {
+            flex: 2;
+            padding: 15px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-predict:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-random {
+            flex: 1;
+            padding: 15px;
+            background: rgba(255,255,255,0.5);
+            color: var(--primary-color);
+            border: 2px solid var(--primary-color);
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-random:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Background Shapes -->
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    <div class="bg-shape shape-3"></div>
+
+    <div class="container">
+        <header style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1>🚗 二手车残值预测</h1>
+                <p class="subtitle">基于机器学习的精准估值模型</p>
+            </div>
+            <a href="/profile" class="btn-random" style="flex: 0 0 auto; padding: 10px 20px; text-decoration: none; display: inline-block;">
+                <i class="fas fa-user"></i> 个人中心
+            </a>
+        </header>
+        
+        <div class="section">
+            <h3><i class="fas fa-edit"></i> 输入车辆信息</h3>
+            <div class="form-grid">
+                <!-- Brand & Series -->
+                <div class="form-group">
+                    <label>品牌</label>
+                    <div class="searchable-select">
+                        <input type="text" id="brand_input" placeholder="输入或选择品牌" autocomplete="off" 
+                               onfocus="showOptions('brand')" oninput="filterOptions('brand')" onblur="hideOptions('brand')">
+                        <i class="fas fa-chevron-down select-icon"></i>
+                        <div id="brand_list" class="options-list"></div>
+                    </div>
+                    <input type="hidden" id="brand_select">
+                </div>
+                <div class="form-group">
+                    <label>车系</label>
+                    <div class="searchable-select">
+                        <input type="text" id="series_input" placeholder="请先选择品牌" autocomplete="off" disabled
+                               onfocus="showOptions('series')" oninput="filterOptions('series')" onblur="hideOptions('series')">
+                        <i class="fas fa-chevron-down select-icon"></i>
+                        <div id="series_list" class="options-list"></div>
+                    </div>
+                    <input type="hidden" id="brand_series">
+                </div>
+
+                <!-- Model Year (New) -->
+                <div class="form-group">
+                    <label>车款年份</label>
+                    <select id="model_year_select" disabled onchange="onModelYearChange()">
+                        <option value="">请先选择车系</option>
+                    </select>
+                </div>
+
+                <!-- Model -->
+                <div class="form-group form-full">
+                    <label>车辆全称</label>
+                    <select id="vehicle_full_name" disabled onchange="onModelChange()">
+                        <option value="">请先选择车系</option>
+                    </select>
+                </div>
+
+                <!-- Date & Years -->
+                <div class="form-group">
+                    <label>上牌时间</label>
+                    <input type="month" id="reg_date" onchange="calculateYears()">
+                </div>
+                <div class="form-group">
+                    <label>使用年限 (年)</label>
+                    <input type="number" id="years" step="0.1" readonly style="background-color: #e9ecef; cursor: not-allowed;" placeholder="自动计算">
+                </div>
+
+                <!-- Grade -->
+                <div class="form-group">
+                    <label>车辆评级</label>
+                    <select id="grade">
+                        <option value="优">优 (A级)</option>
+                        <option value="中" selected>中 (B级)</option>
+                        <option value="差">差 (C级)</option>
+                    </select>
+                </div>
+
+                <!-- City -->
+                <div class="form-group">
+                    <label>省份</label>
+                    <select id="province_select" onchange="onProvinceChange()">
+                        <option value="">加载中...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>城市</label>
+                    <select id="city" disabled>
+                        <option value="">请先选择省份</option>
+                    </select>
+                </div>
+
+                <!-- Mileage -->
+                <div class="form-group">
+                    <label>行驶里程 (万公里)</label>
+                    <input type="number" id="mileage" step="0.1" value="10.0">
+                </div>
+
+                <!-- New Price -->
+                <div class="form-group">
+                    <label>新车价格 (万元)</label>
+                    <input type="number" id="new_price" step="0.01" readonly style="background-color: #e9ecef; cursor: not-allowed;" placeholder="自动获取">
+                </div>
+            </div>
+            
+                            <div class="action-buttons">
+                                <button onclick="predict()" class="btn-predict"><i class="fas fa-calculator"></i> 预测残值</button>
+                                <button onclick="randomNext()" class="btn-random"><i class="fas fa-random"></i> 随机下一辆</button>
+                            </div>
+                            
+                            <div id="favorite-container" style="display: none; margin-top: 15px; text-align: center;">
+                                <button id="btn-favorite" onclick="toggleFavorite()" class="btn-random" style="background: white; width: 100%;">
+                                    <i class="far fa-star"></i> 收藏本次结果
+                                </button>
+                            </div>
+                        </div>
+        
+        <div id="result" style="display: none;"></div>
+        
+        <footer>
+            <p>&copy; 2026 车型库映射系统 | Powered by AI Residual Model</p>
+        </footer>
+    </div>
+
+    <script>
+        // New Logic for Selectors
+        window.brandOptions = [];
+        window.seriesOptions = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await Promise.all([loadBrands(), loadCities()]);
+        });
+
+        // Searchable Select Functions
+        function showOptions(type) {
+            const list = document.getElementById(`${type}_list`);
+            if (list) {
+                list.style.display = 'block';
+                // Always show full list on focus/click
+                const data = type === 'brand' ? window.brandOptions : window.seriesOptions;
+                renderOptions(type, data);
+            }
+        }
+
+        function hideOptions(type) {
+            setTimeout(() => {
+                const list = document.getElementById(`${type}_list`);
+                if (list) list.style.display = 'none';
+                validateInput(type);
+            }, 200);
+        }
+
+        function filterOptions(type) {
+            const input = document.getElementById(`${type}_input`);
+            const query = input.value.toLowerCase().trim();
+            const data = type === 'brand' ? window.brandOptions : window.seriesOptions;
+            
+            const filtered = query ? data.filter(item => item.label.toLowerCase().includes(query)) : data;
+            renderOptions(type, filtered);
+        }
+
+        function renderOptions(type, items) {
+            const list = document.getElementById(`${type}_list`);
+            if (!list) return;
+            
+            if (items.length === 0) {
+                list.innerHTML = '<div class="option-empty">无匹配项</div>';
+                return;
+            }
+            
+            const displayItems = items.slice(0, 100); // Limit rendering
+            list.innerHTML = displayItems.map(item => `
+                <div class="option-item" onclick="selectOption('${type}', '${item.value.replace(/'/g, "\\'")}', '${item.label.replace(/'/g, "\\'")}')">
+                    <span>${item.label}</span>
+                    ${item.count ? `<span style="color:#999; font-size:12px;">${item.count}款</span>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function selectOption(type, value, label) {
+            document.getElementById(`${type}_input`).value = label;
+            const hidden = type === 'brand' ? document.getElementById('brand_select') : document.getElementById('brand_series');
+            hidden.value = value;
+            
+            if (type === 'brand') onBrandChange();
+            else if (type === 'series') onSeriesChange();
+        }
+
+        function validateInput(type) {
+            const input = document.getElementById(`${type}_input`);
+            const hidden = type === 'brand' ? document.getElementById('brand_select') : document.getElementById('brand_series');
+            const data = type === 'brand' ? window.brandOptions : window.seriesOptions;
+            
+            // Allow empty
+            if (!input.value) {
+                hidden.value = '';
+                if (type === 'brand') {
+                    resetSeries();
+                }
+                return;
+            }
+            
+            const match = data.find(item => item.label === input.value);
+            if (match) {
+                if (hidden.value !== match.value) {
+                    hidden.value = match.value;
+                    if (type === 'brand') onBrandChange();
+                    else onSeriesChange();
+                }
+            } else {
+                // Invalid input, reset
+                input.value = '';
+                hidden.value = '';
+                if (type === 'brand') resetSeries();
+            }
+        }
+        
+        function resetSeries() {
+            const seriesInput = document.getElementById('series_input');
+            if (seriesInput) {
+                seriesInput.value = '';
+                seriesInput.disabled = true;
+                seriesInput.placeholder = '请先选择品牌';
+            }
+            document.getElementById('brand_series').value = '';
+            window.seriesOptions = [];
+            
+            // Also reset models
+            const modelSelect = document.getElementById('vehicle_full_name');
+            if (modelSelect) {
+                modelSelect.innerHTML = '<option value="">请先选择车系</option>';
+                modelSelect.disabled = true;
+            }
+            document.getElementById('new_price').value = '';
+        }
+
+        async function loadBrands() {
+            try {
+                const res = await fetch('/api/options/brands');
+                const data = await res.json();
+                if (data.success) {
+                    // Backend returns list of strings for brands
+                    window.brandOptions = data.data.map(b => ({ label: b, value: b }));
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadCities() {
+             try {
+                const res = await fetch('/api/options/cities');
+                const data = await res.json();
+                if (data.success) {
+                    window.cityData = data.data; 
+                    const select = document.getElementById('province_select');
+                    select.innerHTML = '<option value="">请选择省份</option>' + 
+                        Object.keys(data.data).map(p => `<option value="${p}">${p}</option>`).join('');
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function onBrandChange() {
+            const brand = document.getElementById('brand_select').value;
+            const seriesInput = document.getElementById('series_input');
+            
+            // Reset downstream
+            resetSeries();
+            
+            if (!brand) return;
+
+            if (seriesInput) seriesInput.placeholder = '加载中...';
+            
+            try {
+                const res = await fetch(`/api/options/series?brand=${encodeURIComponent(brand)}`);
+                const data = await res.json();
+                if (data.success) {
+                    // Backend returns objects with count for series
+                    window.seriesOptions = data.data.map(s => ({ 
+                        label: s.name, 
+                        value: s.full,
+                        count: s.count
+                    }));
+                    
+                    if (seriesInput) {
+                        seriesInput.disabled = false;
+                        seriesInput.placeholder = '输入或选择车系';
+                    }
+                }
+            } catch (e) { 
+                console.error(e); 
+                if (seriesInput) seriesInput.placeholder = '加载失败';
+            }
+        }
+
+        async function onSeriesChange() {
+            const brandSeries = document.getElementById('brand_series').value;
+            const modelYearSelect = document.getElementById('model_year_select');
+            const modelSelect = document.getElementById('vehicle_full_name');
+            
+            // Reset Model Year
+            modelYearSelect.innerHTML = '<option value="">加载中...</option>';
+            modelYearSelect.disabled = true;
+            
+            // Reset Model
+            modelSelect.innerHTML = '<option value="">请先选择年份</option>';
+            modelSelect.disabled = true;
+            document.getElementById('new_price').value = '';
+
+            if (!brandSeries) {
+                modelYearSelect.innerHTML = '<option value="">请先选择车系</option>';
+                modelSelect.innerHTML = '<option value="">请先选择车系</option>';
+                return;
+            }
+
+            try {
+                // 1. Fetch available model years
+                const res = await fetch(`/api/options/model_years?brand_series=${encodeURIComponent(brandSeries)}`);
+                const data = await res.json();
+                
+                if (data.success && data.data && data.data.length > 0) {
+                    modelYearSelect.innerHTML = '<option value="all">全部年份</option>' + 
+                        data.data.map(y => `<option value="${y}">${y}款</option>`).join('');
+                    modelYearSelect.disabled = false;
+                    // Load all models by default
+                    await loadModels(brandSeries, null);
+                } else {
+                    // If no years found, load all models directly
+                    modelYearSelect.innerHTML = '<option value="all">全部年份</option>';
+                    modelYearSelect.disabled = false;
+                    await loadModels(brandSeries, null);
+                }
+            } catch (e) { 
+                console.error(e);
+                modelYearSelect.innerHTML = '<option value="">加载失败</option>';
+            }
+        }
+
+        async function onModelYearChange() {
+            const brandSeries = document.getElementById('brand_series').value;
+            const year = document.getElementById('model_year_select').value;
+            
+            if (year === 'all') {
+                loadModels(brandSeries, null);
+            } else if (year) {
+                loadModels(brandSeries, year);
+            } else {
+                const modelSelect = document.getElementById('vehicle_full_name');
+                modelSelect.innerHTML = '<option value="">请先选择年份</option>';
+                modelSelect.disabled = true;
+            }
+        }
+
+        async function loadModels(brandSeries, year) {
+            const modelSelect = document.getElementById('vehicle_full_name');
+            modelSelect.innerHTML = '<option value="">加载中...</option>';
+            modelSelect.disabled = true;
+            
+            try {
+                let url = `/api/options/models?brand_series=${encodeURIComponent(brandSeries)}`;
+                if (year) {
+                    url += `&model_year=${encodeURIComponent(year)}`;
+                }
+                
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                if (data.success) {
+                    window.currentModels = data.data;
+                    if (data.data.length === 0) {
+                         modelSelect.innerHTML = '<option value="">该年份无车型数据</option>';
+                    } else {
+                        modelSelect.innerHTML = '<option value="">请选择车型</option>' + 
+                            data.data.map((m, i) => `<option value="${m.name}" data-index="${i}">${m.name}</option>`).join('');
+                        modelSelect.disabled = false;
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+                modelSelect.innerHTML = '<option value="">加载失败</option>';
+            }
+        }
+
+        function onModelChange() {
+            const select = document.getElementById('vehicle_full_name');
+            
+            // Safety check for empty or invalid selection
+            if (select.selectedIndex < 0) {
+                 document.getElementById('new_price').value = '';
+                 return;
+            }
+            
+            const option = select.options[select.selectedIndex];
+            if (!option) {
+                 document.getElementById('new_price').value = '';
+                 return;
+            }
+
+            const index = option.getAttribute('data-index');
+            if (index !== null && window.currentModels && window.currentModels[index]) {
+                const model = window.currentModels[index];
+                document.getElementById('new_price').value = model.new_price || '';
+            } else {
+                 document.getElementById('new_price').value = '';
+            }
+            const name = option.value || option.text;
+            const m = name.match(/(\d{4})款/);
+            if (m) {
+                const y = m[1];
+                const reg = document.getElementById('reg_date');
+                reg.value = `${y}-01`;
+                calculateYears();
+            }
+        }
+
+        function onProvinceChange() {
+            const province = document.getElementById('province_select').value;
+            const citySelect = document.getElementById('city');
+            
+            citySelect.disabled = true;
+            
+            if (!province || !window.cityData) {
+                citySelect.innerHTML = '<option value="">请先选择省份</option>';
+                return;
+            }
+
+            const cities = window.cityData[province];
+            if (cities) {
+                citySelect.innerHTML = '<option value="">请选择城市</option>' + 
+                    cities.map(c => `<option value="${c}">${c}</option>`).join('');
+                citySelect.disabled = false;
+            }
+        }
+
+        function calculateYears() {
+            const dateStr = document.getElementById('reg_date').value;
+            if (!dateStr) return;
+            
+            // dateStr format for type="month" is "YYYY-MM"
+            const [year, month] = dateStr.split('-').map(Number);
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth() + 1;
+            
+            // Calculate difference in years
+            let diffYears = (currentYear - year) + (currentMonth - month) / 12;
+            
+            if (diffYears < 0) diffYears = 0;
+            
+            document.getElementById('years').value = diffYears.toFixed(2);
+        }
+
+        let currentRecordId = null;
+        let isCurrentFavorite = false;
+
+        async function toggleFavorite() {
+            if (!currentRecordId) return;
+            
+            try {
+                const response = await fetch(`/api/history/${currentRecordId}/favorite`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    isCurrentFavorite = data.is_favorite;
+                    updateFavoriteButton();
+                }
+            } catch (e) {
+                console.error("Toggle favorite failed", e);
+            }
+        }
+        
+        function updateFavoriteButton() {
+            const btn = document.getElementById('btn-favorite');
+            if (isCurrentFavorite) {
+                btn.innerHTML = '<i class="fas fa-star" style="color: #f39c12;"></i> 已收藏';
+                btn.style.borderColor = '#f39c12';
+                btn.style.color = '#f39c12';
+            } else {
+                btn.innerHTML = '<i class="far fa-star"></i> 收藏本次结果';
+                btn.style.borderColor = 'var(--primary-color)';
+                btn.style.color = 'var(--primary-color)';
+            }
+        }
+
+        async function predict() {
+            const data = {
+                vehicle_full_name: document.getElementById('vehicle_full_name').value,
+                brand_series: document.getElementById('brand_series').value,
+                years: parseFloat(document.getElementById('years').value),
+                grade: document.getElementById('grade').value,
+                city: document.getElementById('city').value,
+                mileage: parseFloat(document.getElementById('mileage').value)
+            };
+            
+            const newPrice = document.getElementById('new_price').value;
+            if (newPrice) {
+                data.new_price = parseFloat(newPrice);
+            }
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            
+            // 重置收藏按钮
+            document.getElementById('favorite-container').style.display = 'none';
+            currentRecordId = null;
+            isCurrentFavorite = false;
+            updateFavoriteButton();
+            
+            resultDiv.innerHTML = `
+                <div class="section" style="text-align: center; padding: 40px;">
+                    <div class="loading-spinner"></div>
+                    <p style="margin-top: 15px; color: var(--text-secondary);">正在分析市场数据...</p>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 显示收藏按钮
+                    if (result.record_id) {
+                        currentRecordId = result.record_id;
+                        isCurrentFavorite = result.is_favorite;
+                        updateFavoriteButton();
+                        document.getElementById('favorite-container').style.display = 'block';
+                    }
+                    
+                    let html = `
+                        <div class="section">
+                            <h3><i class="fas fa-chart-line"></i> 预测结果</h3>
+                            <div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 20px;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 14px; color: var(--text-secondary);">预测价格</div>
+                                    <div class="price">${result.predicted_price} <span style="font-size: 16px;">万元</span></div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 14px; color: var(--text-secondary);">新车价格</div>
+                                    <div style="font-size: 20px; font-weight: bold; color: var(--text-primary);">${result.new_price} <span style="font-size: 14px;">万元</span></div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 14px; color: var(--text-secondary);">残值率</div>
+                                    <div style="font-size: 20px; font-weight: bold; color: var(--accent);">${(result.residual_rate * 100).toFixed(1)}%</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    if (result.price_matrix && result.price_matrix.b2BPrices) {
+                        // 提取价格用于展示
+                        const currentGrade = document.getElementById('grade').value;
+                        const gradeMap = { '优': 'a', '中': 'b', '差': 'c' };
+                        const targetCol = gradeMap[currentGrade];
+
+                        // 完整价格矩阵表
+                        html += `
+                            <div class="section">
+                                <h3><i class="fas fa-table"></i> 详细价格矩阵</h3>
+                                <div style="overflow-x: auto;">
+                                <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px;">
+                                    <thead>
+                                        <tr style="background: rgba(0,0,0,0.03);">
+                                            <th style="padding: 12px; border: 1px solid var(--border); text-align: left;">交易类型</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border); text-align: center;">优 (A级)</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border); text-align: center;">中 (B级)</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border); text-align: center;">差 (C级)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                        `;
+                        
+                        const types = [
+                            { key: 'c2BPrices', name: '车商收购 (C2B)' },
+                            { key: 'b2BPrices', name: '车商交易 (B2B)' },
+                            { key: 'b2CPrices', name: '车商零售 (B2C)' }
+                        ];
+                        
+                        types.forEach(t => {
+                            const data = result.price_matrix[t.key];
+                            if (data) {
+                                // 样式生成函数
+                                const getStyle = (col) => {
+                                    let s = 'padding: 12px; border: 1px solid var(--border); text-align: center;';
+                                    
+                                    // 默认 B 级列背景
+                                    if (col === 'b') s += ' background: rgba(255, 251, 230, 0.5);';
+                                    
+                                    // B2B 行且匹配当前评级的高亮
+                                    if (t.key === 'b2BPrices' && col === targetCol) {
+                                        s += ' font-weight: 900; color: #333; border: 2px solid var(--primary-color); transform: scale(1.05); box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: #fffde7; position: relative; z-index: 2;'; 
+                                    }
+                                    return s;
+                                };
+
+                                html += `<tr>
+                                    <td style="padding: 12px; border: 1px solid var(--border); font-weight: bold; color: var(--text-primary);">${t.name}</td>
+                                    <td style="${getStyle('a')}">
+                                        <div style="font-size: 1.1em; font-weight: 600;">${data.a.mid}</div>
+                                        <div style="color: var(--text-secondary); font-size: 12px;">${data.a.low} ~ ${data.a.up}</div>
+                                    </td>
+                                    <td style="${getStyle('b')}">
+                                        <div style="font-size: 1.1em; font-weight: 600;">${data.b.mid}</div>
+                                        <div style="color: var(--text-secondary); font-size: 12px;">${data.b.low} ~ ${data.b.up}</div>
+                                    </td>
+                                    <td style="${getStyle('c')}">
+                                        <div style="font-size: 1.1em; font-weight: 600;">${data.c.mid}</div>
+                                        <div style="color: var(--text-secondary); font-size: 12px;">${data.c.low} ~ ${data.c.up}</div>
+                                    </td>
+                                </tr>`;
+                            }
+                        });
+                        
+                        html += `
+                                    </tbody>
+                                </table>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    // 完全相同记录
+                    if (result.identical_records && result.identical_records.length > 0) {
+                        html += '<div class="section"><h3><i class="fas fa-clipboard-check"></i> 完全相同记录</h3>';
+                        result.identical_records.forEach(r => {
+                            const errorPct = Math.abs((r.used_price - result.predicted_price) / r.used_price * 100).toFixed(1);
+                            
+                            let rangeTag = '';
+                            let bgStyle = 'background: rgba(255,255,255,0.8);';
+                            if (r.in_range) {
+                                rangeTag = '<span style="background: rgba(46, 213, 115, 0.2); color: #21ba45; padding: 2px 8px; border-radius: 4px; margin-left: 10px; font-weight: bold; border: 1px solid var(--success);">✅ 在预测区间内</span>';
+                                bgStyle = 'background: rgba(232, 245, 233, 0.6); border: 1px solid var(--success);';
+                            }
+                            
+                            html += `
+                                <div class="similar-vehicle" style="${bgStyle}">
+                                    成交价: <strong style="color: var(--primary-color); font-size: 1.1em;">${r.used_price}万</strong> | 城市: ${r.city} | 年限: ${r.years}年 |
+                                    <span style="color: ${parseFloat(errorPct) < 10 ? 'var(--success)' : parseFloat(errorPct) < 20 ? 'var(--warning)' : 'var(--error)'}; font-weight: bold;">
+                                        误差: ${errorPct}%
+                                    </span>
+                                    ${rangeTag}
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                    }
+                    
+                    // 价格解释报告
+                    if (result.explanation) {
+                        const exp = result.explanation;
+                        html += `
+                            <div class="section" style="background: linear-gradient(135deg, rgba(232, 245, 233, 0.5) 0%, rgba(241, 248, 233, 0.5) 100%); border: 1px solid var(--success);">
+                                <h3><i class="fas fa-lightbulb"></i> 价格解释</h3>
+                                <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 15px; line-height: 1.6;">${exp.summary}</p>
+                                <p><strong>置信度:</strong> <span style="color: ${exp.confidence === 'high' ? 'var(--success)' : exp.confidence === 'medium' ? 'var(--warning)' : 'var(--error)'}; font-weight: bold;">${exp.confidence === 'high' ? '⭐⭐⭐ 高' : exp.confidence === 'medium' ? '⭐⭐ 中' : '⭐ 低'}</span></p>
+                        `;
+                        
+                        if (exp.factors && exp.factors.length > 0) {
+                            html += '<h4 style="margin-top: 15px; color: var(--text-primary);">🔍 影响因素</h4>';
+                            exp.factors.forEach(f => {
+                                const deltaColor = f.delta >= 0 ? 'var(--success)' : 'var(--error)';
+                                const deltaSign = f.delta >= 0 ? '+' : '';
+                                html += `
+                                    <div class="debug-item" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.6);">
+                                        <span><strong>${f.label}</strong>: ${f.reason}</span>
+                                        <span style="color: ${deltaColor}; font-weight: bold; white-space: nowrap; margin-left: 10px;">${deltaSign}${f.delta.toFixed(2)}万</span>
+                                    </div>
+                                `;
+                            });
+                        }
+                        html += '</div>';
+                    }
+                    
+                    if (result.debug) {
+                        const d = result.debug;
+                        html += `
+                            <div class="section">
+                                <h3><i class="fas fa-robot"></i> 模型信息</h3>
+                                <div class="debug-item">使用模型: ${d.model_used}</div>
+                                <div class="debug-item">模型名称: ${d.model_name}</div>
+                                <div class="debug-item">模型类型: ${d.model_type}</div>
+                                <div class="debug-item">模型预测: ${d.model_prediction} 万元</div>
+                                <div class="debug-item">模型R²: ${d.model_r2.toFixed(4)}</div>
+                            </div>
+                            
+                            <div class="section">
+                                <h3><i class="fas fa-sliders-h"></i> 价格调整</h3>
+                                <div class="debug-item">调整方法: ${d.adjustment_method}</div>
+                                <div class="debug-item">相近车辆均价: ${d.similar_avg_price} 万元</div>
+                                <div class="debug-item">调整参数: 偏差=${d.adjustment_params.deviation || 0}, 置信度=${d.adjustment_params.confidence || 0}, δ=${d.adjustment_params.delta || 0}</div>
+                                <div class="debug-item">调整量: ${d.adjustment_delta} 万元</div>
+                            </div>
+                        `;
+                        
+                        if (d.similar_vehicles && d.similar_vehicles.length > 0) {
+                            window.currentSimilarVehicles = d.similar_vehicles;
+                            window.currentPredictedPrice = result.predicted_price;
+
+                            html += '<div class="section"><h3><i class="fas fa-car-side"></i> 相近车辆</h3>';
+                            
+                            html += `
+                                <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
+                                    <span style="font-size: 14px; font-weight: bold; color: var(--text-secondary);"><i class="fas fa-filter"></i> 上牌时间筛选:</span>
+                                    <input type="month" id="sim_filter_start" onchange="filterSimilarVehicles()" style="padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;">
+                                    <span style="color: var(--text-secondary);">-</span>
+                                    <input type="month" id="sim_filter_end" onchange="filterSimilarVehicles()" style="padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;">
+                                    <button onclick="resetSimilarFilter()" style="padding: 6px 12px; background: var(--text-secondary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; transition: background 0.3s;">
+                                        <i class="fas fa-undo"></i> 重置
+                                    </button>
+                                    <span id="sim_count" style="font-size: 12px; color: var(--text-secondary); margin-left: auto;">
+                                        共 ${d.similar_vehicles.length} 辆
+                                    </span>
+                                </div>
+                                <div id="similar_vehicles_list">
+                            `;
+                            
+                            html += renderSimilarVehiclesList(d.similar_vehicles);
+                            html += '</div></div>';
+                        }
+                    }
+                    
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="section" style="border-left: 5px solid var(--error);">
+                            <h3 style="color: var(--error);">预测失败</h3>
+                            <p style="color: var(--error);">${result.error_message}</p>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                resultDiv.innerHTML = `
+                    <div class="section" style="border-left: 5px solid var(--error);">
+                        <h3 style="color: var(--error);">请求失败</h3>
+                        <p style="color: var(--error);">${e.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        async function randomNext() {
+            try {
+                const response = await fetch('/random_vehicle');
+                const v = await response.json();
+                
+                if (v.success) {
+                    // 1. 设置品牌 (支持级联加载)
+                    const brand = v.brand || (v.brand_series ? v.brand_series.split('-')[0] : '');
+                    
+                    // 适配新的搜索框逻辑
+                    if (brand && window.brandOptions) {
+                        const brandMatch = window.brandOptions.find(b => b.value === brand);
+                        if (brandMatch) {
+                            document.getElementById('brand_select').value = brand;
+                            document.getElementById('brand_input').value = brandMatch.label;
+                            await onBrandChange(); // 等待车系加载
+                        }
+                    }
+
+                    // 2. 设置车系
+                    if (v.brand_series) {
+                        // onBrandChange 已填充 window.seriesOptions
+                        const seriesMatch = window.seriesOptions ? window.seriesOptions.find(s => s.value === v.brand_series) : null;
+                        
+                        if (seriesMatch) {
+                            document.getElementById('brand_series').value = v.brand_series;
+                            document.getElementById('series_input').value = seriesMatch.label;
+                            await onSeriesChange(); // 等待车型加载
+                        } else {
+                            // 降级处理：直接设置值
+                            document.getElementById('brand_series').value = v.brand_series;
+                            const seriesName = v.brand_series.includes('-') ? v.brand_series.split('-').slice(1).join('-') : v.brand_series;
+                            document.getElementById('series_input').value = seriesName;
+                            await onSeriesChange();
+                        }
+                    }
+
+                    // 3. 设置车型
+                    if (v.vehicle_full_name) {
+                        document.getElementById('vehicle_full_name').value = v.vehicle_full_name;
+                        onModelChange(); // 设置新车价格
+                    }
+                    
+                    // 4. 设置省份和城市
+                    if (v.city && window.cityData) {
+                        let foundProvince = '';
+                        for (const [prov, cities] of Object.entries(window.cityData)) {
+                            if (cities.includes(v.city)) {
+                                foundProvince = prov;
+                                break;
+                            }
+                        }
+                        // 如果在直辖市等没找到，尝试在"其他"里找
+                        if (!foundProvince && window.cityData['其他'] && window.cityData['其他'].includes(v.city)) {
+                            foundProvince = '其他';
+                        }
+                        
+                        if (foundProvince) {
+                            document.getElementById('province_select').value = foundProvince;
+                            onProvinceChange(); // 加载城市列表
+                            document.getElementById('city').value = v.city;
+                        }
+                    }
+
+                    // 5. 其他字段
+                    document.getElementById('years').value = v.years;
+                    document.getElementById('grade').value = v.grade;
+                    document.getElementById('mileage').value = v.mileage;
+                    // new_price 已经在 onModelChange 中设置，如果 v.new_price 存在且不同，可以覆盖
+                    if (v.new_price) document.getElementById('new_price').value = v.new_price;
+                    
+                    // 6. 自动执行预测
+                    await predict();
+                } else {
+                    alert('获取随机车辆失败');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('请求失败: ' + e.message);
+            }
+        }
+
+        // Similar Vehicle Filtering Helpers
+        function getRegDateFromYears(years) {
+            const today = new Date();
+            const totalMonths = Math.round(years * 12);
+            // Calculate approximate registration date
+            const regDate = new Date(today.getFullYear(), today.getMonth() - totalMonths, 1);
+            return regDate;
+        }
+
+        function formatMonth(date) {
+            const y = date.getFullYear();
+            const m = (date.getMonth() + 1).toString().padStart(2, '0');
+            return `${y}-${m}`;
+        }
+
+        function renderSimilarVehiclesList(vehicles) {
+            if (!vehicles || vehicles.length === 0) {
+                return '<div style="text-align: center; padding: 20px; color: var(--text-secondary);">无符合条件的车辆</div>';
+            }
+
+            const predictedPrice = window.currentPredictedPrice || 0;
+            
+            return vehicles.map(v => {
+                const priceDiff = Math.abs(v.adjusted_price - predictedPrice);
+                const diffPct = predictedPrice ? (priceDiff / predictedPrice * 100).toFixed(0) : 0;
+                
+                let bgColor = 'rgba(255,255,255,0.6)';
+                let borderColor = 'var(--border)';
+                if (diffPct < 5) {
+                    bgColor = 'rgba(232, 245, 233, 0.6)'; borderColor = 'var(--success)';
+                } else if (diffPct < 15) {
+                    bgColor = 'rgba(255, 248, 225, 0.6)'; borderColor = 'var(--warning)';
+                }
+                
+                const gradeColors = {'优': 'var(--success)', '中': 'var(--warning)', '差': 'var(--error)'};
+                const gradeColor = gradeColors[v.grade] || '#999';
+                
+                // Calculate reg date string for display
+                const regDate = getRegDateFromYears(v.years);
+                const regDateStr = formatMonth(regDate);
+
+                return `
+                    <div style="background: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 8px; padding: 12px 15px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                            <strong style="color: var(--text-primary); font-size: 14px;">${v.vehicle_full_name}</strong>
+                            <span style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%); color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">匹配 ${v.score}分</span>
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; color: var(--text-secondary);">
+                            <span style="background: rgba(255,255,255,0.8); padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border);">
+                                💰 <strong style="color: #e65100;">${v.adjusted_price}万</strong>
+                            </span>
+                            <span style="background: rgba(255,255,255,0.8); padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border);">
+                                📅 ${v.years}年 (${regDateStr})
+                            </span>
+                            <span style="background: rgba(255,255,255,0.8); padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border); white-space: nowrap;">
+                                🕒 交易: ${v.transaction_date ? (v.transaction_date.includes('月') ? v.transaction_date.split('月')[0] + '月' : v.transaction_date) : '-'}
+                            </span>
+                            <span style="background: rgba(255,255,255,0.8); padding: 3px 10px; border-radius: 4px; border: 1px solid ${gradeColor};">
+                                ⭐ <span style="color: ${gradeColor}; font-weight: 500;">${v.grade || '-'}</span>
+                            </span>
+                            <span style="background: rgba(255,255,255,0.8); padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border);">
+                                📍 ${v.city || '-'}
+                            </span>
+                            <span style="background: rgba(255,255,255,0.8); padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border);">
+                                🛣️ ${v.mileage || 0}万km
+                            </span>
+                        </div>
+                        <div style="margin-top: 8px; font-size: 11px; color: #888;">
+                            匹配项: ${v.matched_features.slice(0, 5).join(' • ')}${v.matched_features.length > 5 ? '...' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterSimilarVehicles() {
+            const start = document.getElementById('sim_filter_start').value;
+            const end = document.getElementById('sim_filter_end').value;
+            
+            const filtered = window.currentSimilarVehicles.filter(v => {
+                const regDate = getRegDateFromYears(v.years);
+                const regDateStr = formatMonth(regDate);
+                
+                if (start && regDateStr < start) return false;
+                if (end && regDateStr > end) return false;
+                return true;
+            });
+            
+            document.getElementById('similar_vehicles_list').innerHTML = renderSimilarVehiclesList(filtered);
+            document.getElementById('sim_count').innerText = `共 ${filtered.length} 辆`;
+        }
+        
+        function resetSimilarFilter() {
+            document.getElementById('sim_filter_start').value = '';
+            document.getElementById('sim_filter_end').value = '';
+            filterSimilarVehicles();
+        }
+    </script>
+</body>
+</html>

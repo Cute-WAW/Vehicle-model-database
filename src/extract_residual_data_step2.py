@@ -6,17 +6,18 @@
 - 有辆成交价格 (youliang_match_result.txt)
 - 优信拍 (youxinpai_match_result.txt)
 
-输出格式: 数据来源,品牌车系,新车的价格,二手车的成交价,使用年限,车辆评级,车辆大类,车辆小类,车辆属性
+输出格式: 数据来源,品牌车系,新车的价格,二手车的成交价,交易时间,车况校正价,使用年限,车辆评级,车辆大类,车辆小类,车辆属性
 """
 
 import re
+import csv
 from pathlib import Path
 from datetime import datetime
 
 
 
 # 配置评估时间过滤阈值 (只输出该日期及之后的记录)
-EVAL_THRESHOLD = datetime(2023, 1, 1)
+EVAL_THRESHOLD = datetime(2010, 1, 1)
 
 
 def clean_city_name(city_str: str) -> str:
@@ -91,9 +92,13 @@ def parse_cheyipai_line(input_line: str, match_line: str, score_line: str = None
         else:
             brand_series = f"{input_data[0].strip()}-未知车系"
 
-        # 2. 日期与年限
+        # 日期与年限
         reg_date_str = input_data[2].strip()  # 2016年4月1日
-        deal_date_str = input_data[9].strip() # 11月28日 (可能缺少年份)
+        # Check if index 9 exists
+        if len(input_data) > 9:
+            deal_date_str = input_data[9].strip() # 11月28日 (可能缺少年份)
+        else:
+            deal_date_str = "2024年1月1日" # Fallback
         
         reg_year, reg_month = parse_date_cyp(reg_date_str)
         
@@ -163,6 +168,7 @@ def parse_cheyipai_line(input_line: str, match_line: str, score_line: str = None
             '品牌车系': brand_series,
             '新车的价格': new_price,
             '二手车的成交价': used_price,
+            '交易时间': deal_date_str,  # Add transaction date
             '车况校正价': adjusted_price,
             '使用年限': years,
             '车辆评级': grade_label,
@@ -276,6 +282,7 @@ def parse_youliang_line(input_line: str, match_line: str, score_line: str = None
         # 解析输入行
         input_parts = input_line.split('|')
         if len(input_parts) < 2:
+            # print(f"Invalid input line format: {input_line[:50]}...")
             return None
         
         # 提取车辆全称：【输入】后面的车辆描述部分
@@ -334,19 +341,26 @@ def parse_youliang_line(input_line: str, match_line: str, score_line: str = None
         
         # 解析匹配行获取新车价格
         if '无匹配结果' in match_line:
+            # print("No match result in match line")
             return None
         
         match_parts = match_line.split('|')
         if len(match_parts) < 2:
+            # print("Invalid match line format")
             return None
         
         match_data = match_parts[1].strip().split(',')
         # 新车价格是逗号分隔的第5项（索引4）
-        if len(match_data) < 12:
-            return None
+        # if len(match_data) < 12:
+        #    # print(f"Not enough match data fields: {len(match_data)} < 12")
+        #    return None
         
         try:
-            new_price = float(match_data[4].strip())
+            # Check if index 4 exists
+            if len(match_data) > 4:
+                new_price = float(match_data[4].strip())
+            else:
+                return None
         except:
             return None
             
@@ -373,6 +387,7 @@ def parse_youliang_line(input_line: str, match_line: str, score_line: str = None
             '品牌车系': brand_series,
             '新车的价格': new_price,
             '二手车的成交价': used_price,
+            '交易时间': eval_date,  # Add transaction date
             '车况校正价': adjusted_price,
             '使用年限': years,
             '车辆评级': grade_label,
@@ -383,6 +398,7 @@ def parse_youliang_line(input_line: str, match_line: str, score_line: str = None
             '行驶里程': mileage
         }
     except Exception as e:
+        # print(f"Error parsing youxinpai line: {e}")
         return None
 
 
@@ -394,6 +410,7 @@ def parse_youxinpai_line(input_line: str, match_line: str, score_line: str = Non
         # 解析输入行
         input_parts = input_line.split('|')
         if len(input_parts) < 2:
+            print(f"Invalid youxinpai input line format: {input_line[:50]}...")
             return None
         
         # 提取车辆全称：【输入】后面的车辆描述部分
@@ -401,6 +418,8 @@ def parse_youxinpai_line(input_line: str, match_line: str, score_line: str = Non
         vehicle_full_name = input_parts[0].replace('【输入】', '').strip()
         # 将 / 替换为空格，得到标准格式
         vehicle_full_name = vehicle_full_name.replace('/', ' ')
+        
+        # print(f"DEBUG: Vehicle Name: {vehicle_full_name}")
         
         # 从【输入】后的文字中提取品牌车系
         # 优先从【得分】行的识别结果提取品牌车系
@@ -421,32 +440,45 @@ def parse_youxinpai_line(input_line: str, match_line: str, score_line: str = Non
             input_name = input_parts[0].replace('【输入】', '').strip()
             name_parts = input_name.split('/')
             if len(name_parts) < 2:
+                print("Failed to parse brand/series from input name")
                 return None
             brand = name_parts[0].strip()
             series = name_parts[1].strip()
             brand_series = f"{brand}-{series}"
+            
+        # print(f"DEBUG: Brand-Series: {brand_series}")
         
         # 解析逗号分隔的数据部分
         input_data = input_parts[1].strip().split(',')
         if len(input_data) < 5:
+            print(f"Not enough input data fields: {len(input_data)} < 5")
             return None
         
         # 评级码 (第2项，索引1)
         grade_code = input_data[1].strip()
         grade = extract_grade_from_code(grade_code)
         if not grade:
-            return None
+            print(f"Grade extraction failed for code: {grade_code}")
+            # Try to be more lenient or use a default if it looks valid
+            # e.g. 80AA -> A
+            if len(grade_code) >= 3 and grade_code[-1] in 'ABCD':
+                grade = grade_code[-1]
+            else:
+                return None
         
         # 二手车成交价 (第3项，索引2) 格式: 1.82万元
         price_str = input_data[2].strip().replace('万元', '')
         try:
             used_price = round(float(price_str), 2)
         except:
+            print(f"Price parsing failed: {price_str}")
             return None
         
         # 日期: 评估日期(第4项) - 注册日期(第5项)
         eval_date_str = input_data[3].strip()  # 2025年12月
         reg_date_str = input_data[4].strip()   # 2017年12月
+        
+        # print(f"DEBUG: Dates - Eval: {eval_date_str}, Reg: {reg_date_str}")
         
         # 行驶里程 (第6项，索引5) 122192公里
         mileage_str = input_data[5].strip().replace('公里', '')
@@ -457,43 +489,66 @@ def parse_youxinpai_line(input_line: str, match_line: str, score_line: str = Non
 
         eval_year, eval_month = parse_date_yxp(eval_date_str)
         reg_year, reg_month = parse_date_yxp(reg_date_str)
-
+        
+        # print(f"DEBUG: Parsed Dates - Eval: {eval_year}-{eval_month}, Reg: {reg_year}-{reg_month}")
+        
         # 时间过滤
         if eval_year and eval_month:
             # 优信拍只有年月，默认按当月1号与阈值比较
             eval_dt = datetime(eval_year, eval_month, 1)
+            # print(f"Date check: {eval_dt} vs {EVAL_THRESHOLD}")
             if eval_dt < EVAL_THRESHOLD:
+                # print(f"Filtered by date: {eval_dt} < {EVAL_THRESHOLD}")
                 return None
         else:
+            # print(f"Missing eval date: {eval_year}, {eval_month}")
             return None
         
         # 计算使用年限
         years = calculate_years(eval_year, eval_month, reg_year, reg_month)
+        # print(f"DEBUG: Years: {years}")
         if years is None:
+            # print("Years calculation returned None")
             return None
         
         # 解析匹配行获取新车价格
+        new_price = 0.0
+        vehicle_type = '未知'
+        vehicle_size = '未知'
+        vehicle_attr = '未知'
+        
+        # 即使无匹配结果，也可以尝试使用输入行的数据
         if '无匹配结果' in match_line:
-            return None
-        
-        match_parts = match_line.split('|')
-        if len(match_parts) < 2:
-            return None
-        
-        match_data = match_parts[1].strip().split(',')
-        # 新车价格是逗号分隔的第5项（索引4）
-        if len(match_data) < 12:
-            return None
-        
-        try:
-            new_price = float(match_data[4].strip())
-        except:
-            return None
-            
-            return None
-            
+            # print("No match result in match line")
+            pass
+        else:
+            match_parts = match_line.split('|')
+            if len(match_parts) >= 2:
+                match_data = match_parts[1].strip().split(',')
+                # print(f"DEBUG: Match Data: {match_data}")
+                
+                # 尝试提取新车价格
+                try:
+                    if len(match_data) > 4:
+                        new_price_str = match_data[4].strip()
+                        if new_price_str and new_price_str.lower() != 'nan':
+                            new_price = float(new_price_str)
+                except Exception as e:
+                    # print(f"New price parsing failed: {e}")
+                    pass
+                
+                # 尝试提取车辆类型信息
+                if len(match_data) > 7:
+                    vehicle_type = match_data[7].strip()
+                if len(match_data) > 8:
+                    vehicle_size = match_data[8].strip()
+                if len(match_data) > 11:
+                    vehicle_attr = match_data[11].strip()
+
         grade_label = map_grade(grade)
         adjusted_price = calculate_adjusted_price(used_price, grade_label)
+        
+        # print(f"DEBUG: Grade: {grade_label}, Adjusted: {adjusted_price}")
         
         # 提取城市 (第7项，索引6)
         # 对应输入行: ...| 宝骏/...,杭州,非营运,棕色
@@ -507,16 +562,18 @@ def parse_youxinpai_line(input_line: str, match_line: str, score_line: str = Non
             '品牌车系': brand_series,
             '新车的价格': new_price,
             '二手车的成交价': used_price,
+            '交易时间': eval_date_str,  # Add transaction date
             '车况校正价': adjusted_price,
             '使用年限': years,
             '车辆评级': grade_label,
-            '车辆大类': match_data[7].strip(),
-            '车辆小类': match_data[8].strip(),
-            '车辆属性': match_data[11].strip(),
+            '车辆大类': vehicle_type,
+            '车辆小类': vehicle_size,
+            '车辆属性': vehicle_attr,
             '城市': city,
             '行驶里程': mileage
         }
     except Exception as e:
+        # print(f"Exception in parse_youxinpai_line: {e}")
         return None
 
 
@@ -548,10 +605,13 @@ def process_file(file_path: str, parser_func) -> list:
                 if score_candidate.startswith('【得分】'):
                     score_line = score_candidate
             
+            # print(f"Processing line {i}: match_line found? {bool(match_line)}")
             if match_line:
                 result = parser_func(input_line, match_line, score_line)
                 if result:
                     results.append(result)
+                # else:
+                #    print(f"Failed to parse line {i}")
             
             i += 3  # 跳过输入、匹配、得分三行
         else:
@@ -568,6 +628,7 @@ def main():
     youliang_file = script_dir / 'output' / 'youliang_match_result.txt'
     youxinpai_file = script_dir / 'output' / 'youxinpai_match_result.txt'
     cheyipai_file = script_dir / 'output' / 'cheyipai_match_result.txt'
+    batch_file = script_dir / 'output' / 'batch_match_result.txt'
     
     # 输出文件
     output_file = script_dir / 'output' / 'residual_value_data.csv'
@@ -582,6 +643,25 @@ def main():
         all_results.extend(results)
     else:
         print(f"文件不存在: {cheyipai_file}")
+    
+    # 处理批量匹配数据 (视为优信拍格式)
+    if batch_file.exists():
+        print(f"处理批量匹配数据: {batch_file}")
+        # results = process_file(str(batch_file), parse_youxinpai_line)
+        # Use a simplified approach for debugging
+        with open(batch_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        print(f"Total lines in batch file: {len(lines)}")
+        
+        # Try to parse the first record manually to see why it fails
+        # for i in range(min(20, len(lines))):
+            # ... debug code ...
+        
+        results = process_file(str(batch_file), parse_youxinpai_line)
+        print(f"  提取有效记录: {len(results)} 条")
+        all_results.extend(results)
+    else:
+        print(f"文件不存在: {batch_file}")
     
     # 处理有辆数据
     if youliang_file.exists():
@@ -606,26 +686,42 @@ def main():
     print(f"输出文件: {output_file}")
     
     
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, 'w', encoding='utf-8', newline='') as f:
         # 写入表头
-        f.write('数据来源,车辆全称,品牌车系,新车的价格,二手车的成交价,车况校正价,使用年限,车辆评级,车辆大类,车辆小类,车辆属性,城市,行驶里程\n')
+        writer = csv.writer(f)
+        writer.writerow(['数据来源', '车辆全称', '品牌车系', '新车的价格', '二手车的成交价', '交易时间', '车况校正价', '使用年限', '车辆评级', '车辆大类', '车辆小类', '车辆属性', '城市', '行驶里程'])
         
         # 写入数据
         count_filtered_grade = 0
         count_filtered_years = 0
         
         for r in all_results:
-            # 过滤 车辆评级 为未知的数据
+            # 过滤无效数据
+            if not r['使用年限'] or r['使用年限'] <= 0:
+                count_filtered_years += 1
+                continue
+            
+            # 过滤评级未知的记录
             if r['车辆评级'] == '未知':
                 count_filtered_grade += 1
                 continue
             
-            # 过滤 使用年限 不是数字的数据
-            if not isinstance(r['使用年限'], (int, float)):
-                count_filtered_years += 1
-                continue
-            
-            f.write(f"{r['数据来源']},{r['车辆全称']},{r['品牌车系']},{r['新车的价格']},{r['二手车的成交价']},{r['车况校正价']},{r['使用年限']},{r['车辆评级']},{r['车辆大类']},{r['车辆小类']},{r['车辆属性']},{r['城市']},{r['行驶里程']}\n")
+            writer.writerow([
+                r['数据来源'],
+                r['车辆全称'],
+                r['品牌车系'],
+                r['新车的价格'],
+                r['二手车的成交价'],
+                r['交易时间'],
+                r['车况校正价'],
+                r['使用年限'],
+                r['车辆评级'],
+                r['车辆大类'],
+                r['车辆小类'],
+                r['车辆属性'],
+                r['城市'],
+                r['行驶里程']
+            ])
             
         print(f"过滤掉 '车辆评级=未知' 的数据: {count_filtered_grade} 条")
         print(f"过滤掉 '使用年限!=数字' 的数据: {count_filtered_years} 条")

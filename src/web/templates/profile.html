@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 - 二手车残值预测系统</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #3498db;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --light-gray: #f5f6fa;
+            --border-color: #dcdde1;
+            --bg-card: #ffffff;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light-gray);
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            padding: 30px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        h1, h2, h3 {
+            color: var(--primary-color);
+            margin-top: 0;
+        }
+        
+        .profile-header {
+            display: flex;
+            align-items: center;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .avatar {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--accent-color), #2980b9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            margin-right: 25px;
+            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+        }
+        
+        .user-info h2 {
+            margin-bottom: 5px;
+            font-size: 24px;
+        }
+        
+        .user-info p {
+            margin: 0;
+            color: #7f8c8d;
+        }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 25px;
+        }
+        
+        .tab-btn {
+            padding: 12px 25px;
+            background: none;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #7f8c8d;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.3s;
+        }
+        
+        .tab-btn:hover {
+            color: var(--accent-color);
+        }
+        
+        .tab-btn.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+        
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Forms */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+        
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2980b9;
+            transform: translateY(-1px);
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        
+        .btn-secondary {
+            background-color: #95a5a6;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #7f8c8d;
+        }
+        
+        .alert {
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .alert.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        
+        .alert.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        
+        .section-title {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            margin-top: 30px;
+            font-size: 18px;
+        }
+
+        .nav-links {
+            margin-top: 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+        }
+        
+        .action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px 20px;
+            background: linear-gradient(to right, #ffffff, #f9fbfd);
+            border-radius: 12px;
+            border: 1px solid #eef0f5;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            transition: all 0.3s ease;
+        }
+        
+        .action-bar:hover {
+            box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+            transform: translateY(-1px);
+        }
+
+        .checkbox-container {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 15px;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .checkbox-container input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #bdc3c7;
+            border-radius: 6px;
+            margin-right: 8px;
+            outline: none;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+            background-color: white;
+            display: grid;
+            place-content: center;
+        }
+        
+        .checkbox-container input[type="checkbox"]::before {
+            content: "\f00c";
+            font-family: "Font Awesome 5 Free";
+            font-weight: 900;
+            font-size: 12px;
+            color: white;
+            transform: scale(0);
+            transition: 0.1s transform ease-in-out;
+        }
+        
+        .checkbox-container input[type="checkbox"]:checked {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+        
+        .checkbox-container input[type="checkbox"]:checked::before {
+            transform: scale(1);
+        }
+        
+        .checkbox-container label {
+            margin-bottom: 0;
+            font-weight: 600;
+            color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .history-item.selected {
+            border-color: var(--accent-color);
+            background-color: #f0f9ff;
+            box-shadow: 0 0 0 1px rgba(52, 152, 219, 0.2);
+        }
+
+        /* History List Styles */
+        .history-list {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .history-item {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .history-item:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transform: translateY(-2px);
+            border-color: var(--accent-color);
+        }
+        
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        
+        .vehicle-name {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: var(--primary-color);
+        }
+        
+        .history-date {
+            font-size: 0.85em;
+            color: #95a5a6;
+        }
+        
+        .history-details {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9em;
+            color: #555;
+            margin-bottom: 10px;
+        }
+        
+        .price-tag {
+            color: var(--success-color);
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .star-btn {
+            background: none;
+            border: none;
+            color: #bdc3c7;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 5px;
+            transition: color 0.2s;
+        }
+        
+        .star-btn.active {
+            color: #f39c12;
+        }
+        
+        .star-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #95a5a6;
+        }
+        
+        .empty-state i {
+            font-size: 3em;
+            margin-bottom: 15px;
+            color: #bdc3c7;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="profile-header">
+                <div class="avatar" id="avatar">U</div>
+                <div class="user-info">
+                    <h2 id="nickname">加载中...</h2>
+                    <p id="username">@username</p>
+                </div>
+                <div style="margin-left: auto;">
+                    <a href="/" class="btn-secondary" style="margin-right: 10px;"><i class="fas fa-home"></i> 返回首页</a>
+                    <button id="logoutBtn" class="btn-secondary" style="background-color: #f39c12;"><i class="fas fa-sign-out-alt"></i> 退出</button>
+                </div>
+            </div>
+            
+            <div id="message" class="alert"></div>
+            
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('history')"><i class="fas fa-history"></i> 预测历史</button>
+                <button class="tab-btn" onclick="switchTab('favorites')"><i class="fas fa-star"></i> 我的收藏</button>
+                <button class="tab-btn" onclick="switchTab('settings')"><i class="fas fa-cog"></i> 账号设置</button>
+            </div>
+            
+            <!-- 历史记录 Tab -->
+            <div id="history" class="tab-content active">
+                <div class="action-bar" id="historyActionBar" style="display: none;">
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="selectAllHistory" onchange="toggleSelectAll('history')">
+                        <label for="selectAllHistory">全选</label>
+                    </div>
+                    <button class="btn-danger" onclick="deleteSelected('history')" style="padding: 8px 15px; font-size: 14px; border-radius: 6px; box-shadow: 0 2px 5px rgba(231, 76, 60, 0.2);">
+                        <i class="fas fa-trash"></i> 批量删除
+                    </button>
+                </div>
+                <div id="historyList" class="history-list">
+                    <div class="empty-state">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>加载中...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 收藏 Tab -->
+            <div id="favorites" class="tab-content">
+                <div class="action-bar" id="favoritesActionBar" style="display: none;">
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="selectAllFavorites" onchange="toggleSelectAll('favorites')">
+                        <label for="selectAllFavorites">全选</label>
+                    </div>
+                    <button class="btn-danger" onclick="deleteSelected('favorites')" style="padding: 8px 15px; font-size: 14px; border-radius: 6px; box-shadow: 0 2px 5px rgba(231, 76, 60, 0.2);">
+                        <i class="fas fa-trash"></i> 批量删除
+                    </button>
+                </div>
+                <div id="favoritesList" class="history-list">
+                    <div class="empty-state">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>加载中...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 设置 Tab -->
+            <div id="settings" class="tab-content">
+                <h3 class="section-title">修改密码</h3>
+                <form id="changePasswordForm">
+                    <div class="form-group">
+                        <label for="oldPassword">当前密码</label>
+                        <input type="password" id="oldPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">新密码</label>
+                        <input type="password" id="newPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">确认新密码</label>
+                        <input type="password" id="confirmPassword" required>
+                    </div>
+                    <button type="submit" class="btn-primary">修改密码</button>
+                </form>
+                
+                <h3 class="section-title" style="color: var(--danger-color);">危险区域</h3>
+                <div style="border: 1px solid var(--danger-color); padding: 15px; border-radius: 4px; background-color: #fff5f5;">
+                    <p>注销账号将永久删除您的所有数据，此操作无法撤销。</p>
+                    <button id="deleteAccountBtn" class="btn-danger">注销账号</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 注销确认弹窗 -->
+    <div id="deleteModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000;">
+        <div style="background: white; padding: 30px; border-radius: 8px; width: 400px; max-width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+            <h3 style="margin-top: 0; color: var(--danger-color);">确认注销账号？</h3>
+            <p>请输入您的密码以确认此操作：</p>
+            <input type="password" id="deletePassword" placeholder="请输入密码" style="margin-bottom: 20px;">
+            <div style="text-align: right;">
+                <button id="cancelDelete" class="btn-secondary">取消</button>
+                <button id="confirmDelete" class="btn-danger">确认注销</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const messageEl = document.getElementById('message');
+        const avatarEl = document.getElementById('avatar');
+        const nicknameEl = document.getElementById('nickname');
+        const usernameEl = document.getElementById('username');
+        
+        // 页面加载
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUserInfo();
+            loadHistory(); // 默认加载历史
+        });
+        
+        function switchTab(tabId) {
+            // Update buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            
+            // Load data if needed
+            if (tabId === 'history') loadHistory();
+            if (tabId === 'favorites') loadFavorites();
+        }
+        
+        function showMessage(text, type = 'success') {
+            messageEl.textContent = text;
+            messageEl.className = `alert ${type}`;
+            setTimeout(() => {
+                messageEl.className = 'alert';
+                messageEl.textContent = '';
+            }, 3000);
+        }
+
+        // 加载用户信息
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('/api/user/me');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const user = data.user;
+                    nicknameEl.textContent = user.nickname || '用户';
+                    usernameEl.textContent = `@${user.username}`;
+                    avatarEl.textContent = (user.nickname || user.username)[0].toUpperCase();
+                } else {
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                console.error('Failed to load user info:', error);
+                window.location.href = '/login';
+            }
+        }
+        
+        // 渲染记录列表
+        function renderList(containerId, items, isFavoritesTab = false) {
+            const container = document.getElementById(containerId);
+            const actionBarId = isFavoritesTab ? 'favoritesActionBar' : 'historyActionBar';
+            const actionBar = document.getElementById(actionBarId);
+            
+            if (!items || items.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="far fa-folder-open"></i>
+                        <p>${isFavoritesTab ? '暂无收藏记录' : '暂无预测记录'}</p>
+                    </div>
+                `;
+                if(actionBar) actionBar.style.display = 'none';
+                return;
+            }
+            
+            if(actionBar) actionBar.style.display = 'flex';
+            
+            container.innerHTML = items.map(item => `
+                <div class="history-item" id="item-${item.id}" onclick="toggleSelect('${item.id}', event)">
+                    <div class="checkbox-container">
+                        <input type="checkbox" class="item-checkbox ${isFavoritesTab ? 'fav-check' : 'hist-check'}" value="${item.id}" onchange="updateSelectionState(this)">
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="history-header">
+                            <div class="vehicle-name">${item.vehicle_info.vehicle_full_name}</div>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="star-btn ${item.is_favorite ? 'active' : ''}" 
+                                        onclick="event.stopPropagation(); toggleStar('${item.id}', this, ${isFavoritesTab})" 
+                                        title="${item.is_favorite ? '取消收藏' : '添加收藏'}">
+                                    <i class="${item.is_favorite ? 'fas' : 'far'} fa-star"></i>
+                                </button>
+                                <button class="star-btn" style="color: var(--danger-color);"
+                                        onclick="event.stopPropagation(); deleteSingle('${item.id}', ${isFavoritesTab})" 
+                                        title="删除记录">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="history-details">
+                            <span><i class="fas fa-calendar-alt"></i> ${item.vehicle_info.years}年</span>
+                            <span><i class="fas fa-tachometer-alt"></i> ${item.vehicle_info.mileage}万公里</span>
+                            <span><i class="fas fa-map-marker-alt"></i> ${item.vehicle_info.city}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                            <div>
+                                <span style="font-size: 0.9em; color: #7f8c8d;">预测估值: </span>
+                                <span class="price-tag">${item.prediction_result.predicted_price}万</span>
+                            </div>
+                            <span class="history-date">${new Date(item.created_at).toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function toggleSelect(id, event) {
+            // 如果点击的是 checkbox 本身或按钮，不处理
+            if (event.target.tagName === 'INPUT' || event.target.closest('button')) return;
+            
+            const checkbox = document.querySelector(`#item-${id} input[type="checkbox"]`);
+            checkbox.checked = !checkbox.checked;
+            updateSelectionState(checkbox);
+        }
+        
+        function updateSelectionState(checkbox) {
+            const item = checkbox.closest('.history-item');
+            if (checkbox.checked) {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+        }
+        
+        function toggleSelectAll(type) {
+            const isFav = type === 'favorites';
+            const masterCheckbox = document.getElementById(isFav ? 'selectAllFavorites' : 'selectAllHistory');
+            const checkboxes = document.querySelectorAll(isFav ? '.fav-check' : '.hist-check');
+            
+            checkboxes.forEach(cb => {
+                cb.checked = masterCheckbox.checked;
+                updateSelectionState(cb);
+            });
+        }
+        
+        async function deleteSingle(id, isFavoritesTab) {
+            if (!confirm('确定要删除这条记录吗？')) return;
+            await performDelete([id], isFavoritesTab);
+        }
+        
+        async function deleteSelected(type) {
+            const isFav = type === 'favorites';
+            const checkboxes = document.querySelectorAll(isFav ? '.fav-check:checked' : '.hist-check:checked');
+            
+            if (checkboxes.length === 0) {
+                showMessage('请先选择要删除的记录', 'error');
+                return;
+            }
+            
+            if (!confirm(`确定要删除选中的 ${checkboxes.length} 条记录吗？`)) return;
+            
+            const ids = Array.from(checkboxes).map(cb => cb.value);
+            await performDelete(ids, isFav);
+        }
+        
+        async function performDelete(ids, isFavoritesTab) {
+            try {
+                const response = await fetch('/api/history', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ record_ids: ids })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    // Reload current list
+                    if (isFavoritesTab) loadFavorites();
+                    else loadHistory();
+                } else {
+                    showMessage(data.message || '删除失败', 'error');
+                }
+            } catch (e) {
+                console.error("Delete failed", e);
+                showMessage('请求失败', 'error');
+            }
+        }
+
+        async function loadHistory() {
+            try {
+                const response = await fetch('/api/user/history');
+                const data = await response.json();
+                if (data.success) {
+                    renderList('historyList', data.history, false);
+                }
+            } catch (e) {
+                console.error("Load history failed", e);
+            }
+        }
+        
+        async function loadFavorites() {
+            try {
+                const response = await fetch('/api/user/history?favorites_only=true');
+                const data = await response.json();
+                if (data.success) {
+                    renderList('favoritesList', data.history, true);
+                }
+            } catch (e) {
+                console.error("Load favorites failed", e);
+            }
+        }
+        
+        async function toggleStar(id, btnElement, isFavoritesTab) {
+            try {
+                const response = await fetch(`/api/history/${id}/favorite`, { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    // Update UI
+                    if (isFavoritesTab) {
+                        // If in favorites tab and unfavorited, reload list
+                        loadFavorites();
+                    } else {
+                        // Toggle icon
+                        const icon = btnElement.querySelector('i');
+                        if (data.is_favorite) {
+                            btnElement.classList.add('active');
+                            icon.classList.remove('far');
+                            icon.classList.add('fas');
+                        } else {
+                            btnElement.classList.remove('active');
+                            icon.classList.remove('fas');
+                            icon.classList.add('far');
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Toggle failed", e);
+            }
+        }
+
+        // 退出登录
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
+        });
+
+        // 修改密码
+        document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const oldPassword = document.getElementById('oldPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            if (newPassword !== confirmPassword) {
+                showMessage('两次输入的新密码不一致', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/auth/change_password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showMessage('密码修改成功', 'success');
+                    document.getElementById('changePasswordForm').reset();
+                } else {
+                    showMessage(data.message || '密码修改失败', 'error');
+                }
+            } catch (error) {
+                showMessage('请求失败，请稍后重试', 'error');
+            }
+        });
+
+        // 注销账号逻辑
+        const deleteModal = document.getElementById('deleteModal');
+        const deleteBtn = document.getElementById('deleteAccountBtn');
+        const cancelDeleteBtn = document.getElementById('cancelDelete');
+        const confirmDeleteBtn = document.getElementById('confirmDelete');
+        
+        deleteBtn.addEventListener('click', () => {
+            deleteModal.style.display = 'flex';
+        });
+        
+        cancelDeleteBtn.addEventListener('click', () => {
+            deleteModal.style.display = 'none';
+        });
+        
+        confirmDeleteBtn.addEventListener('click', async () => {
+            const password = document.getElementById('deletePassword').value;
+            if (!password) {
+                alert('请输入密码');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/auth/delete_account', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: password })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('账号已注销');
+                    window.location.href = '/login';
+                } else {
+                    alert(data.message || '注销失败');
+                }
+            } catch (error) {
+                alert('请求失败');
+            }
+        });
+    </script>
+</body>
+</html>
