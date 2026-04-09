@@ -1,0 +1,24 @@
+{
+  "users_columns": [
+    "id",
+    "username",
+    "email",
+    "password_hash",
+    "wechat_openid",
+    "nickname",
+    "avatar_url",
+    "role",
+    "status",
+    "last_login_at",
+    "created_at",
+    "updated_at"
+  ],
+  "history_columns": [
+    "id",
+    "username",
+    "vehicle_info",
+    "prediction_result",
+    "is_favorite",
+    "created_at"
+  ]
+}

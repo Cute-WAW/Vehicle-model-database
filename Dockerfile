@@ -1,5 +1,5 @@
-# 使用 Daocloud 镜像加速
-FROM docker.m.daocloud.io/python:3.9-slim
+# 使用官方 Python 3.9 slim 镜像作为基础
+FROM python:3.9-slim
 
 # Replace apt sources with Aliyun mirrors for China connectivity
 RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \

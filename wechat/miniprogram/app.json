@@ -2,7 +2,9 @@
     "pages": [
         "pages/index/index",
         "pages/result/result",
-        "pages/history/history"
+        "pages/history/history",
+        "pages/profile/profile",
+        "pages/login/login"
     ],
     "window": {
         "backgroundTextStyle": "dark",

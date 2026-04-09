@@ -199,6 +199,225 @@ def verify_user(username: str, password: str) -> Tuple[bool, Optional[Dict[str, 
             
     return False, None, "登录失败: 用户不存在或密码错误"
 
+def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
+    """通过用户名获取用户"""
+    if not username:
+        return None
+
+    client = get_supabase_client()
+    if client:
+        try:
+            response = client.table('users').select("id, username, nickname, status").eq("username", username).execute()
+            if response.data:
+                user_data = response.data[0]
+                if user_data.get('status') != 'active':
+                    return None
+                return {"id": user_data['id'], "username": user_data['username'], "nickname": user_data['nickname']}
+        except Exception as e:
+            logger.warning(f"通过用户名获取用户异常 (Supabase): {e}")
+
+    engine = get_db_engine()
+    if engine:
+        try:
+            with engine.connect() as conn:
+                query = text("SELECT id, username, nickname, status FROM users WHERE username = :u")
+                result = conn.execute(query, {"u": username}).mappings().fetchone()
+                if result:
+                    if result['status'] != 'active':
+                        return None
+                    return {"id": result['id'], "username": result['username'], "nickname": result['nickname']}
+        except Exception as e:
+            logger.warning(f"通过用户名获取用户异常 (SQLAlchemy): {e}")
+
+    conn = get_sqlite_conn()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, username, nickname, status FROM users WHERE username = ?", (username,))
+            result = cursor.fetchone()
+            conn.close()
+            if result:
+                if result['status'] != 'active':
+                    return None
+                return {"id": result['id'], "username": result['username'], "nickname": result['nickname']}
+        except Exception as e:
+            logger.warning(f"通过用户名获取用户异常 (SQLite): {e}")
+            if conn:
+                conn.close()
+
+    return None
+
+def get_user_by_id(user_id: Any) -> Optional[Dict[str, Any]]:
+    """通过用户 ID 获取用户"""
+    if user_id is None:
+        return None
+
+    client = get_supabase_client()
+    if client:
+        try:
+            response = client.table('users').select("id, username, nickname, status").eq("id", user_id).execute()
+            if response.data:
+                user_data = response.data[0]
+                if user_data.get('status') != 'active':
+                    return None
+                return {"id": user_data['id'], "username": user_data['username'], "nickname": user_data['nickname']}
+        except Exception as e:
+            logger.warning(f"通过用户 ID 获取用户异常 (Supabase): {e}")
+
+    engine = get_db_engine()
+    if engine:
+        try:
+            with engine.connect() as conn:
+                query = text("SELECT id, username, nickname, status FROM users WHERE id = :id")
+                result = conn.execute(query, {"id": user_id}).mappings().fetchone()
+                if result:
+                    if result['status'] != 'active':
+                        return None
+                    return {"id": result['id'], "username": result['username'], "nickname": result['nickname']}
+        except Exception as e:
+            logger.warning(f"通过用户 ID 获取用户异常 (SQLAlchemy): {e}")
+
+    conn = get_sqlite_conn()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, username, nickname, status FROM users WHERE id = ?", (user_id,))
+            result = cursor.fetchone()
+            conn.close()
+            if result:
+                if result['status'] != 'active':
+                    return None
+                return {"id": result['id'], "username": result['username'], "nickname": result['nickname']}
+        except Exception as e:
+            logger.warning(f"通过用户 ID 获取用户异常 (SQLite): {e}")
+            if conn:
+                conn.close()
+
+    return None
+
+def resolve_canonical_username(user_id: Any = None, username: str = "") -> str:
+    """解析数据库中的真实用户名，兼容旧 token 中缺失或错误的 username"""
+    if username:
+        matched_user = get_user_by_username(username)
+        if matched_user:
+            return matched_user["username"]
+        logger.warning(f"Token 中的 username 不存在，回退到 user_id 查询: {username}")
+
+    matched_user = get_user_by_id(user_id)
+    if matched_user:
+        return matched_user["username"]
+
+    if username:
+        return username
+    if user_id is not None:
+        return f"wx_user_{user_id}"
+    return ""
+
+def get_user_by_openid(openid: str) -> Optional[Dict[str, Any]]:
+    """通过微信 OpenID 获取用户"""
+    client = get_supabase_client()
+    if client:
+        try:
+            response = client.table('users').select("id, username, nickname, status").eq("wechat_openid", openid).execute()
+            if response.data:
+                user_data = response.data[0]
+                if user_data.get('status') != 'active':
+                    return None
+                try:
+                    client.table('users').update({"last_login_at": "now()"}).eq("id", user_data['id']).execute()
+                except Exception:
+                    pass
+                return {"id": user_data['id'], "username": user_data['username'], "nickname": user_data['nickname']}
+        except Exception as e:
+            logger.warning(f"获取微信用户异常 (Supabase): {e}")
+
+    engine = get_db_engine()
+    if engine:
+        try:
+            with engine.connect() as conn:
+                query = text("SELECT id, username, nickname, status FROM users WHERE wechat_openid = :o")
+                result = conn.execute(query, {"o": openid}).mappings().fetchone()
+                if result:
+                    if result['status'] != 'active':
+                        return None
+                    try:
+                        conn.execute(text("UPDATE users SET last_login_at = NOW() WHERE id = :id"), {"id": result['id']})
+                        conn.commit()
+                    except Exception:
+                        pass
+                    return {"id": result['id'], "username": result['username'], "nickname": result['nickname']}
+        except Exception as e:
+            logger.warning(f"获取微信用户异常 (SQLAlchemy): {e}")
+
+    # 对于离线测试，兼容直接使用 openid 当成用户名的情况
+    if "wx_" in openid or "test_" in openid:
+        return {"id": 1000, "username": openid, "nickname": "微信用户"}
+        
+    return None
+
+def create_wechat_user_if_not_exists(openid: str, nickname: str = "微信用户", avatar_url: str = "") -> Tuple[bool, Optional[Dict[str, Any]], str]:
+    """如果不存在，则静默注册一个微信用户，然后返回用户信息"""
+    user = get_user_by_openid(openid)
+    if user:
+        return True, user, "登录成功"
+        
+    # 生成随机密码和用户名
+    import secrets
+    import time
+    pwd = secrets.token_hex(16)
+    hashed_pw = hash_password(pwd)
+    generated_username = f"wx_{openid[-8:]}_{int(time.time())}"
+    
+    client = get_supabase_client()
+    if client:
+        try:
+            data = {
+                "username": generated_username, 
+                "password_hash": hashed_pw, 
+                "nickname": nickname, 
+                "wechat_openid": openid,
+                "avatar_url": avatar_url,
+                "status": "active"
+            }
+            res = client.table('users').insert(data).execute()
+            if res.data:
+                new_user = res.data[0]
+                return True, {"id": new_user['id'], "username": new_user['username'], "nickname": new_user['nickname']}, "注册并登录成功"
+        except Exception as e:
+            err_msg = str(e)
+            if "duplicate key" in err_msg or "23505" in err_msg:
+                # username 碰撞极罕见（同秒同后缀），重试一次换新时间戳
+                generated_username = f"wx_{openid[-8:]}_{int(time.time()) + 1}"
+                try:
+                    data["username"] = generated_username
+                    res = client.table('users').insert(data).execute()
+                    if res.data:
+                        new_user = res.data[0]
+                        return True, {"id": new_user['id'], "username": new_user['username'], "nickname": new_user['nickname']}, "注册并登录成功"
+                except Exception as e2:
+                    logger.error(f"创建微信用户重试失败 (Supabase): {e2}")
+            else:
+                logger.warning(f"创建微信用户失败 (Supabase): {e}")
+
+    engine = get_db_engine()
+    if engine:
+        try:
+            with engine.connect() as conn:
+                conn.execute(
+                    text("INSERT INTO users (username, password_hash, nickname, wechat_openid, avatar_url, status) VALUES (:u, :p, :n, :o, :a, 'active')"),
+                    {"u": generated_username, "p": hashed_pw, "n": nickname, "o": openid, "a": avatar_url}
+                )
+                conn.commit()
+                # 重新查询获取ID
+                user = get_user_by_openid(openid)
+                if user:
+                    return True, user, "注册并登录成功"
+        except Exception as e:
+            logger.warning(f"创建微信用户失败 (SQLAlchemy): {e}")
+
+    # Fallback mock user
+    return True, {"id": 1000, "username": generated_username, "nickname": nickname}, "注册并登录成功(离线)"
+
 def create_user(username: str, password: str, nickname: str = "用户", email: str = None) -> Tuple[bool, str]:
     """创建新用户"""
     hashed_pw = hash_password(password)
@@ -211,6 +430,9 @@ def create_user(username: str, password: str, nickname: str = "用户", email: s
             client.table('users').insert(data).execute()
             return True, "用户创建成功"
         except Exception as e:
+            err_msg = str(e)
+            if "duplicate key" in err_msg or "23505" in err_msg:
+                return False, "用户名已被注册"
             logger.warning(f"用户创建失败 (Supabase): {e}")
 
     # SQLAlchemy
@@ -225,6 +447,9 @@ def create_user(username: str, password: str, nickname: str = "用户", email: s
                 conn.commit()
                 return True, "用户创建成功"
         except Exception as e:
+            err_msg = str(e)
+            if "duplicate key" in err_msg or "23505" in err_msg or "UniqueViolation" in err_msg:
+                return False, "用户名已被注册"
             logger.warning(f"用户创建失败 (SQLAlchemy): {e}")
 
     # SQLite

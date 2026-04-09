@@ -11,12 +11,15 @@ from datetime import datetime, timedelta
 from typing import Optional
 from dataclasses import dataclass
 
+import logging
 import jwt
 from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+logger = logging.getLogger("wechat_auth")
 # JWT 配置
-SECRET_KEY = os.getenv("JWT_SECRET", secrets.token_hex(32))
+# 优先从环境变量读取，开发环境提供固定默认值防止重启导致 Token 失效
+SECRET_KEY = os.getenv("JWT_SECRET", "car_mapping_secret_2026_dev_fixed")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24 * 7  # 7 天
 
@@ -54,24 +57,29 @@ def decode_access_token(token: str) -> Optional[dict]:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
     except jwt.ExpiredSignatureError:
+        logger.warning(f"Token expired: {token[:10]}...")
         raise HTTPException(status_code=401, detail="Token 已过期")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="无效的 Token")
+    except jwt.InvalidTokenError as e:
+        logger.warning(f"Invalid token '{token[:10]}...': {str(e)}")
+        raise HTTPException(status_code=401, detail=f"无效的 Token: {str(e)}")
+    except Exception as e:
+        logger.error(f"Token decode error: {str(e)}")
+        raise HTTPException(status_code=401, detail="认证解析异常")
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> dict:
     """
     从请求头获取当前用户
-    
-    用法:
-        @app.get("/protected")
-        def protected_route(user: dict = Depends(get_current_user)):
-            return {"user_id": user["user_id"]}
     """
     token = credentials.credentials
+    logger.info(f"Incoming request with token: {token[:15]}...")
+    
     payload = decode_access_token(token)
     if payload is None or "user_id" not in payload:
-        raise HTTPException(status_code=401, detail="无效的认证信息")
+        logger.warning(f"Payload missing user_id: {payload}")
+        raise HTTPException(status_code=401, detail="无效的认证信息 (Missing user_id)")
+    
+    logger.info(f"Auth successful for user_id: {payload.get('user_id')}")
     return payload
 
 

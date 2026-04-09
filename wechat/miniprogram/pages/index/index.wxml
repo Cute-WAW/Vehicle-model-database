@@ -117,5 +117,8 @@
     <button class="btn-secondary" bindtap="goToHistory">
       📋 历史记录
     </button>
+    <button class="btn-secondary" bindtap="goToProfile">
+      👤 我的中心
+    </button>
   </view>
 </view>

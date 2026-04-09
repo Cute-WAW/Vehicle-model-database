@@ -1,0 +1,49 @@
+<view class="container">
+  <!-- 头部区域: 头像与昵称 -->
+  <view class="header-card">
+    <view class="avatar-area">
+      <view class="avatar-placeholder">👤</view>
+    </view>
+    
+    <view class="user-info" wx:if="{{loggedIn}}">
+      <text class="nickname">{{userInfo.nickname || '微信用户'}}</text>
+      <text class="user-id">系统账号 ID: {{userInfo.id || '--'}}</text>
+    </view>
+    
+    <view class="user-info" wx:else>
+      <text class="nickname">未登录</text>
+      <text class="user-id">请登录以获取估价和保存历史</text>
+    </view>
+  </view>
+
+  <!-- 状态诊断面板 -->
+  <view class="status-panel">
+    <view class="panel-header">
+      <text class="panel-title">网络与安全诊断</text>
+    </view>
+    <view class="status-item">
+      <text class="item-label">当前状态</text>
+      <text class="item-value {{loggedIn ? 'text-green' : 'text-gray'}}">{{loggedIn ? '已连接授权' : '无授权 (离线)'}}</text>
+    </view>
+    <view class="status-item">
+      <text class="item-label">系统环境</text>
+      <text class="item-value">{{isDev ? '局域网测试模式' : '生产云端模式'}}</text>
+    </view>
+    <view class="status-item" wx:if="{{loggedIn}}">
+      <text class="item-label">安全凭证(Token)</text>
+      <view class="token-container">
+        <text class="token-text">{{tokenPreview}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 操作按钮区域 -->
+  <view class="action-area">
+    <button wx:if="{{!loggedIn}}" class="btn-login" bindtap="goToLogin">
+      前往登录
+    </button>
+    <button wx:else class="btn-logout" bindtap="handleLogout">
+      退出当前账号
+    </button>
+  </view>
+</view>

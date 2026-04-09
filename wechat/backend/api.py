@@ -14,17 +14,27 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
+import logging
 from auth import create_access_token, get_current_user, create_test_token
-from database import (
-    init_db, get_or_create_user, get_user_evaluations,
-    get_evaluation_by_id, delete_evaluation, save_evaluation,
-    get_user_evaluation_count
+
+logger = logging.getLogger("wechat_api")
+from db_supabase import (
+    create_wechat_user_if_not_exists,
+    add_history_record,
+    get_user_history,
+    delete_history_records,
+    resolve_canonical_username
 )
 
-# 初始化数据库
-init_db()
-
 router = APIRouter(prefix="/api", tags=["小程序API"])
+
+
+def get_db_username(user: dict) -> str:
+    """统一从 token payload 中提取数据库用户名。"""
+    return resolve_canonical_username(
+        user_id=user.get("user_id"),
+        username=user.get("username", "")
+    )
 
 
 # ========== 请求/响应模型 ==========
@@ -75,28 +85,62 @@ async def login(request: LoginRequest):
     """
     微信登录
     
-    小程序调用 wx.login() 获取 code，发送到此接口换取 token
+    小程序调用 wx.login() 获取 code，发送到此接口换取 token。
+    当前已预留调用微信 jscode2session 接口获取真实 OpenID 的逻辑代码。
     """
-    # TODO: 实际环境需要调用微信 API 换取 openid
-    # https://api.weixin.qq.com/sns/jscode2session
+    import os
+    import requests
     
-    # 这里简化处理，直接用 code 作为 openid (仅测试)
-    openid = f"wx_{request.code}"
+    # =====================================================================
+    # 【预留接口】真实获取微信 OpenID 逻辑 (后续需在 .env 配置这两项)
+    # =====================================================================
+    WECHAT_APPID = os.getenv("WECHAT_APPID", "")
+    WECHAT_SECRET = os.getenv("WECHAT_SECRET", "")
     
-    user = get_or_create_user(openid, request.nickname, request.avatar_url)
+    openid = None
+    
+    if WECHAT_APPID and WECHAT_SECRET and not request.code.startswith("test_"):
+        # 1. 生产环境：向微信服务器请求真实 openid
+        url = f"https://api.weixin.qq.com/sns/jscode2session?appid={WECHAT_APPID}&secret={WECHAT_SECRET}&js_code={request.code}&grant_type=authorization_code"
+        try:
+            response = requests.get(url, timeout=5)
+            data = response.json()
+            if "openid" in data:
+                openid = data["openid"]
+                # session_key = data.get("session_key") # 若需解密加密数据可保存
+            else:
+                raise HTTPException(status_code=400, detail=f"微信登录失败: {data.get('errmsg', '未知错误')}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"请求微信接口异常: {str(e)}")
+    else:
+        # 2. 本地测试环境：自动回退使用 code 拼接模拟 openid
+        openid = f"wx_mock_{request.code}"
+        
+    if not openid:
+        raise HTTPException(status_code=400, detail="获取 OpenID 失败")
+
+    # =====================================================================
+    # 3. 将 OpenID 与 Supabase 数据库互联并注册/登录
+    # =====================================================================
+    success, user, msg = create_wechat_user_if_not_exists(
+        openid=openid, 
+        nickname=request.nickname, 
+        avatar_url=request.avatar_url
+    )
+    
+    if not success or not user:
+        raise HTTPException(status_code=400, detail=msg or "微信登录失败")
     
     token = create_access_token({
-        "user_id": user.id,
-        "nickname": user.nickname
+        "user_id": user["id"],
+        "username": user.get("username", ""),
+        "nickname": user.get("nickname", "用户")
     })
     
     return {
         "success": True,
         "token": token,
-        "user": user.to_dict() if hasattr(user, 'to_dict') else {
-            "id": user.id,
-            "nickname": user.nickname
-        }
+        "user": user
     }
 
 
@@ -107,21 +151,26 @@ async def test_login(request: TestLoginRequest):
     
     不需要真实微信 code，直接使用测试 openid
     """
-    user = get_or_create_user(request.test_openid, request.nickname)
+    success, user, msg = create_wechat_user_if_not_exists(
+        openid=request.test_openid, 
+        nickname=request.nickname
+    )
+    
+    logger.info(f"Test login successful for openid: {request.test_openid}. User: {user}")
     
     token = create_access_token({
-        "user_id": user.id,
-        "nickname": user.nickname,
+        "user_id": user["id"],
+        "username": user.get("username", ""),
+        "nickname": user.get("nickname", "用户"),
         "type": "test"
     })
+    
+    logger.info(f"Generated test token: {token[:15]}...")
     
     return {
         "success": True,
         "token": token,
-        "user": {
-            "id": user.id,
-            "nickname": user.nickname
-        }
+        "user": user
     }
 
 
@@ -206,21 +255,36 @@ async def predict_with_auth(
         price_low = float(b2b.get('low', price_low))
         price_high = float(b2b.get('up', price_high))
     
-    # 保存历史
+    # 保存历史 (对接 Supabase prediction_history)
     eval_id = None
     if request.save_history:
-        eval_id = save_evaluation(
-            user_id=user['user_id'],
-            vehicle_full_name=request.vehicle_full_name,
-            brand_series=request.brand_series,
-            years=request.years,
-            mileage=request.mileage,
-            grade=request.grade,
-            predicted_price=result.predicted_price,
-            price_low=price_low,
-            price_high=price_high,
-            explanation=explanation
+        vehicle_info = {
+            "vehicle_full_name": request.vehicle_full_name,
+            "brand_series": request.brand_series,
+            "years": request.years,
+            "mileage": request.mileage,
+            "grade": request.grade
+        }
+        prediction_result = {
+            "predicted_price": result.predicted_price,
+            "price_low": price_low,
+            "price_high": price_high,
+            "new_price": result.new_price,
+            "residual_rate": result.residual_rate,
+            "price_matrix": result.price_matrix,
+            "explanation": explanation
+        }
+        
+        # 正确提取存入 token 的 username，以满足 Supabase 的 users 表外键关联
+        db_username = get_db_username(user)
+        
+        success, record_id, msg = add_history_record(
+            username=db_username,
+            vehicle_info=vehicle_info,
+            prediction_result=prediction_result
         )
+        if success:
+            eval_id = record_id
     
     # 获取最相关的10个成交记录
     similar_vehicles = []
@@ -280,15 +344,40 @@ async def get_history(
     user: dict = Depends(get_current_user)
 ):
     """获取估价历史列表"""
-    items = get_user_evaluations(user['user_id'], limit, offset)
-    total = get_user_evaluation_count(user['user_id'])
+    db_username = get_db_username(user)
+    raw_items = get_user_history(username=db_username, favorites_only=False)
+    
+    # 格式化数据结构以适配小程序前端 history.wxml 的预期
+    items = []
+    for item in raw_items:
+        v_info = item.get("vehicle_info", {})
+        p_res = item.get("prediction_result", {})
+        
+        formatted = {
+            "id": item["id"],
+            "user_id": user['user_id'],
+            "vehicle_full_name": v_info.get("vehicle_full_name", "未知车型"),
+            "brand_series": v_info.get("brand_series", ""),
+            "years": v_info.get("years", 0),
+            "mileage": v_info.get("mileage", 0),
+            "grade": v_info.get("grade", "中"),
+            "predicted_price": p_res.get("predicted_price", 0),
+            "price_low": p_res.get("price_low", 0),
+            "price_high": p_res.get("price_high", 0),
+            "explanation": p_res.get("explanation"),
+            "created_at": str(item["created_at"])[:19] # 切割掉时区和微秒
+        }
+        items.append(formatted)
+        
+    # 处理分页
+    total = len(items)
+    paginated_items = items[offset:offset+limit]
     
     return {
         "success": True,
         "total": total,
-        "items": items
+        "items": paginated_items
     }
-
 
 @router.get("/history/{eval_id}")
 async def get_history_detail(
@@ -296,16 +385,35 @@ async def get_history_detail(
     user: dict = Depends(get_current_user)
 ):
     """获取单条估价记录详情"""
-    item = get_evaluation_by_id(eval_id, user['user_id'])
+    db_username = get_db_username(user)
+    raw_items = get_user_history(username=db_username)
     
+    item = next((x for x in raw_items if x["id"] == eval_id), None)
     if not item:
         raise HTTPException(status_code=404, detail="记录不存在")
+        
+    v_info = item.get("vehicle_info", {})
+    p_res = item.get("prediction_result", {})
+    
+    formatted = {
+        "id": item["id"],
+        "user_id": user['user_id'],
+        "vehicle_full_name": v_info.get("vehicle_full_name", "未知车型"),
+        "brand_series": v_info.get("brand_series", ""),
+        "years": v_info.get("years", 0),
+        "mileage": v_info.get("mileage", 0),
+        "grade": v_info.get("grade", "中"),
+        "predicted_price": p_res.get("predicted_price", 0),
+        "price_low": p_res.get("price_low", 0),
+        "price_high": p_res.get("price_high", 0),
+        "explanation": p_res.get("explanation"),
+        "created_at": str(item["created_at"])[:19]
+    }
     
     return {
         "success": True,
-        "item": item
+        "item": formatted
     }
-
 
 @router.delete("/history/{eval_id}")
 async def delete_history(
@@ -313,10 +421,11 @@ async def delete_history(
     user: dict = Depends(get_current_user)
 ):
     """删除估价记录"""
-    success = delete_evaluation(eval_id, user['user_id'])
+    db_username = get_db_username(user)
+    success, msg = delete_history_records(username=db_username, record_ids=[eval_id])
     
     if not success:
-        raise HTTPException(status_code=404, detail="记录不存在")
+        raise HTTPException(status_code=400, detail=msg)
     
     return {"success": True, "message": "已删除"}
 
@@ -326,17 +435,16 @@ async def delete_history(
 @router.get("/test/token")
 async def get_test_token():
     """获取测试 Token (仅开发环境)"""
-    from database import get_or_create_user
-    
-    user = get_or_create_user("test_dev_user", "开发测试")
+    success, user, msg = create_wechat_user_if_not_exists("test_dev_user", "开发测试")
     token = create_access_token({
-        "user_id": user.id,
-        "nickname": user.nickname,
+        "user_id": user["id"],
+        "username": user.get("username", ""),
+        "nickname": user.get("nickname", "开发测试"),
         "type": "dev"
     })
     
     return {
         "token": token,
-        "user_id": user.id,
+        "user_id": user["id"],
         "usage": "添加到请求头: Authorization: Bearer <token>"
     }

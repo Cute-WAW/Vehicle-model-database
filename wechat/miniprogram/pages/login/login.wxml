@@ -1,0 +1,18 @@
+<view class="container">
+  <view class="logo-area">
+    <view class="logo-circle">
+      <text class="logo-text">🚗</text>
+    </view>
+    <text class="title">二手车估价助手</text>
+    <text class="subtitle">登录以保存您的专属估价记录</text>
+  </view>
+
+  <view class="btn-area">
+    <button class="btn-primary" bindtap="handleLogin" loading="{{loading}}">
+      💬 微信一键登录
+    </button>
+    <button class="btn-cancel" bindtap="handleCancel">
+      暂不登录
+    </button>
+  </view>
+</view>

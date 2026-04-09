@@ -1,3 +1,30 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:9f8a9e9153563ac30f7396682b2e191bc696acb3dc439569653d8a51463bcadb
-size 310
+# 核心 Web 框架
+fastapi
+uvicorn[standard]
+python-multipart
+jinja2
+pydantic
+requests
+
+# 数据处理与科学计算
+pandas
+numpy
+scikit-learn
+scipy
+pyyaml
+
+# 数据库与存储
+supabase
+sqlalchemy
+psycopg2-binary
+python-dotenv
+
+# 专用功能库
+captcha
+PyJWT
+python-docx
+paramiko
+watchdog
+
+# 其他
+itsdangerous

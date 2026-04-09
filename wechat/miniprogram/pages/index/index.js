@@ -35,8 +35,7 @@ Page({
     // 自动登录
     async autoLogin() {
         try {
-            // 开发环境使用测试登录
-            await app.testLogin();
+            await app.loginWithEnvironment();
             this.setData({ loggedIn: true });
             wx.showToast({ title: '登录成功', icon: 'success' });
         } catch (e) {
@@ -162,6 +161,13 @@ Page({
     goToHistory() {
         wx.navigateTo({
             url: '/pages/history/history'
+        });
+    },
+
+    // 跳转到个人中心
+    goToProfile() {
+        wx.navigateTo({
+            url: '/pages/profile/profile'
         });
     }
 });

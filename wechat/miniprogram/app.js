@@ -1,17 +1,37 @@
 // 全局配置
 const config = {
-    // API 地址 (开发环境用本地，生产环境改为云服务器地址)
-    // apiBaseUrl: 'http://localhost:8003/api',
-    // 真机调试请使用本机局域网IP
-    apiBaseUrl: 'http://192.168.50.74:8003/api',
+    // API 地址
+    // 开发工具模拟器（本地）用:
+    // apiBaseUrl: 'http://127.0.0.1:8003/api',
+    // 真机调试（手机与电脑在同一 WiFi 下）用局域网 IP:
+    apiBaseUrl: 'http://192.168.1.53:8003/api',
+    // 生产环境:
     // apiBaseUrl: 'https://your-domain.com/api',
 };
 
 App({
+    config: config,
     globalData: {
         userInfo: null,
         token: null,
         config: config
+    },
+
+    getApiBaseUrl() {
+        const overrideUrl = wx.getStorageSync('apiBaseUrl');
+        if (overrideUrl) {
+            return overrideUrl;
+        }
+        return this.config?.apiBaseUrl || this.globalData.config?.apiBaseUrl || '';
+    },
+
+    isDevEnvironment() {
+        const apiBaseUrl = this.getApiBaseUrl();
+        return apiBaseUrl.includes('127.0.0.1') || apiBaseUrl.includes('localhost');
+    },
+
+    loginWithEnvironment() {
+        return this.isDevEnvironment() ? this.testLogin() : this.login();
     },
 
     onLaunch() {
@@ -31,7 +51,7 @@ App({
                     if (res.code) {
                         // 发送 code 到后端换取 token
                         wx.request({
-                            url: `${config.apiBaseUrl}/auth/login`,
+                            url: `${this.getApiBaseUrl()}/auth/login`,
                             method: 'POST',
                             data: {
                                 code: res.code,
@@ -59,14 +79,20 @@ App({
         });
     },
 
-    // 测试登录 (开发环境)
+    // 测试登录 (开发环境) - 使用固定的 openid 避免每次创建新用户
     testLogin() {
+        // 复用 Storage 中已存在的 test_openid，避免每次生成新用户占满 Supabase
+        let stableOpenid = wx.getStorageSync('dev_test_openid');
+        if (!stableOpenid) {
+            stableOpenid = 'test_dev_' + Math.random().toString(36).slice(2, 10);
+            wx.setStorageSync('dev_test_openid', stableOpenid);
+        }
         return new Promise((resolve, reject) => {
             wx.request({
-                url: `${config.apiBaseUrl}/auth/test-login`,
+                url: `${this.getApiBaseUrl()}/auth/test-login`,
                 method: 'POST',
                 data: {
-                    test_openid: 'test_' + Date.now(),
+                    test_openid: stableOpenid,
                     nickname: '测试用户'
                 },
                 success: (response) => {
@@ -92,7 +118,7 @@ App({
         return new Promise((resolve, reject) => {
             wx.request({
                 ...options,
-                url: options.url.startsWith('http') ? options.url : `${config.apiBaseUrl}${options.url}`,
+                url: options.url.startsWith('http') ? options.url : `${this.getApiBaseUrl()}${options.url}`,
                 header: {
                     'Content-Type': 'application/json',
                     'Authorization': token ? `Bearer ${token}` : '',
@@ -100,8 +126,9 @@ App({
                 },
                 success: (response) => {
                     if (response.statusCode === 401) {
-                        // Token 过期，重新登录
-                        this.login().then(() => {
+                        // Token 过期或无效，尝试重新登录
+                        this.loginWithEnvironment().then(() => {
+                            // 登录成功后重试原请求
                             this.request(options).then(resolve).catch(reject);
                         }).catch(reject);
                     } else {

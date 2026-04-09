@@ -1,0 +1,13 @@
+{
+  "supabase_client": true,
+  "user_create_success": true,
+  "user": {
+    "id": 1000,
+    "username": "test_real_openid_999",
+    "nickname": "微信用户"
+  },
+  "msg": "登录成功",
+  "history_success": true,
+  "history_rid": "24",
+  "history_msg": "记录已保存 (本地)"
+}
