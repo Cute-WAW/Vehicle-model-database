@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Dict
 
 from batch_model_trainer_step4 import BatchModelTrainer, ResidualValueModel, safe_filename
+from model_paths import get_model_dirs
 
 
 def build_car_types_models(
@@ -148,7 +149,7 @@ def build_car_types_models(
 def main():
     parser = argparse.ArgumentParser(description='车辆类别批量建模程序')
     parser.add_argument('--data', default='../output/residual_value_data.csv', help='数据文件路径')
-    parser.add_argument('--output', default='../price_model/car_types_model', help='模型输出目录')
+    parser.add_argument('--output', default=str(get_model_dirs(Path(__file__).parent.parent)['car_types']), help='模型输出目录')
     parser.add_argument('--iqr_factor', type=float, default=1.0, help='IQR过滤系数')
     
     args = parser.parse_args()
@@ -172,14 +173,7 @@ def main():
         data_path = args.data
 
     # Resolve output path
-    p_out = Path(args.output)
-    if not p_out.is_absolute():
-        if args.output.startswith('..'):
-             output_dir = str(script_dir / args.output)
-        else:
-             output_dir = args.output
-    else:
-        output_dir = args.output
+    output_dir = str(Path(args.output).resolve())
     
     # 检查数据文件
     if not Path(data_path).exists():

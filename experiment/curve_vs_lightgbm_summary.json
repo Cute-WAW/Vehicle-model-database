@@ -1,0 +1,45 @@
+{
+  "generated_at": "2026-04-16T18:25:56.919395",
+  "data_path": "D:\\BaiduNetdiskDownload\\车型库映射\\车型库映射\\data\\youxinpai_vehicles-2026年1-3月份.csv",
+  "sample_size": 299,
+  "curve": {
+    "total_samples": 299,
+    "success_count": 201,
+    "success_rate": 67.22,
+    "fallback_count": 0,
+    "c2b_hit_rate": 20.9,
+    "b2b_hit_rate": 28.86,
+    "mae": 1.046,
+    "mape": 30.0,
+    "median_ape": 18.45,
+    "r2": 0.7935,
+    "avg_predicted_price": 4.18
+  },
+  "lightgbm": {
+    "total_samples": 299,
+    "success_count": 201,
+    "success_rate": 67.22,
+    "fallback_count": 0,
+    "c2b_hit_rate": 19.9,
+    "b2b_hit_rate": 30.35,
+    "mae": 0.96,
+    "mape": 25.59,
+    "median_ape": 17.82,
+    "r2": 0.8102,
+    "avg_predicted_price": 3.964
+  },
+  "deltas": {
+    "success_rate": 0.0,
+    "b2b_hit_rate": 1.49,
+    "mape": -4.41,
+    "r2": 0.0167
+  },
+  "replacement_conditions": {
+    "mape_not_worse": true,
+    "r2_not_worse": true,
+    "b2b_hit_rate_not_worse": true,
+    "success_rate_not_worse": true
+  },
+  "lightgbm_ready_to_replace": true,
+  "bucket_stats_path": "D:\\BaiduNetdiskDownload\\车型库映射\\车型库映射\\experiment\\curve_vs_lightgbm_bucket_stats.csv"
+}

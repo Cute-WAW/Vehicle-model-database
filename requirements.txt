@@ -12,6 +12,7 @@ numpy
 scikit-learn
 scipy
 pyyaml
+lightgbm
 
 # 数据库与存储
 supabase
@@ -25,6 +26,7 @@ PyJWT
 python-docx
 paramiko
 watchdog
+pytest
 
 # 其他
 itsdangerous

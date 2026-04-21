@@ -96,3 +96,46 @@ rules:
 
 **效果**：
 开启后，命中率从 36.25% 提升至 **48.15%** (v2 参数)。详见 `experiment/hit_rate_20251231.md`。
+
+---
+
+## 4. 模型切换配置 (`config/model_strategy.yaml`)
+
+**应用场景：**
+用于 `src/residual_predictor_step5.py`。控制预测主链路优先使用哪一类模型，以及 `lightgbm` 失败后是否允许回退到旧 `curve`。
+
+**主要配置项：**
+
+### 4.1 默认模型家族 (`default_model_family`)
+
+可选值：
+
+- `curve`
+- `lightgbm`
+
+含义：
+
+- `curve`：默认优先使用旧曲线模型
+- `lightgbm`：默认优先使用新 LightGBM 模型
+
+### 4.2 是否允许回退 (`allow_curve_fallback`)
+
+```yaml
+allow_curve_fallback: true
+```
+
+含义：
+
+- 当优先模型为 `lightgbm` 且对应模型文件缺失或预测失败时，是否回退到旧 `curve`
+
+### 4.3 当前默认配置
+
+```yaml
+default_model_family: lightgbm
+allow_curve_fallback: true
+```
+
+**说明：**
+
+- 当前默认优先使用 `lightgbm`
+- 当 `lightgbm` 失败时，仍允许自动回退到 `curve`

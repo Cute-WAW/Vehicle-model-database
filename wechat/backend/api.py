@@ -27,6 +27,7 @@ from db_supabase import (
 )
 
 router = APIRouter(prefix="/api", tags=["小程序API"])
+get_shared_predictor = None
 
 
 def get_db_username(user: dict) -> str:
@@ -76,6 +77,32 @@ class HistoryListResponse(BaseModel):
     success: bool
     total: int
     items: List[dict]
+
+
+def _get_default_residual_csv() -> Path:
+    """Prefer the richer merged dataset for WeChat runtime."""
+    project_root = Path(__file__).parent.parent.parent
+    candidates = [
+        project_root / 'output' / 'merged_residual_value_data_with_dates.csv',
+        project_root / 'output' / 'merged_residual_value_data.csv',
+        project_root / 'output' / 'residual_value_data_for_build_model.csv',
+    ]
+    for path in candidates:
+        if path.exists():
+            return path
+    return candidates[-1]
+
+
+def _get_predictor_instance():
+    """Use the singleton predictor injected by `wechat.backend.main` when available."""
+    global get_shared_predictor
+    if callable(get_shared_predictor):
+        predictor = get_shared_predictor()
+        if predictor is not None:
+            return predictor
+
+    from residual_predictor_step5 import ResidualPredictor
+    return ResidualPredictor(residual_data_csv=str(_get_default_residual_csv()))
 
 
 # ========== 认证接口 ==========
@@ -181,13 +208,7 @@ async def random_vehicle():
     """获取随机一辆车的信息"""
     import random
     from dataclasses import asdict
-    from residual_predictor_step5 import ResidualPredictor
-    
-    # 使用共享的预测器实例 (如果有的话)
-    # 这里的路径需要确保正确
-    predictor = ResidualPredictor(
-        residual_data_csv=str(Path(__file__).parent.parent.parent / 'output' / 'residual_value_data_for_build_model.csv')
-    )
+    predictor = _get_predictor_instance()
     
     records = predictor.data_index.records
     if not records:
@@ -215,13 +236,9 @@ async def predict_with_auth(
     
     返回预测价格、价格区间、解释报告，并可选保存到历史
     """
-    from residual_predictor_step5 import ResidualPredictor
     from price_logic_step6 import explain_price
     
-    # 使用共享的预测器实例 (如果有的话)
-    predictor = ResidualPredictor(
-        residual_data_csv=str(Path(__file__).parent.parent.parent / 'output' / 'residual_value_data_for_build_model.csv')
-    )
+    predictor = _get_predictor_instance()
     
     result = predictor.predict(
         vehicle_full_name=request.vehicle_full_name,

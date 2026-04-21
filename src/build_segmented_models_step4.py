@@ -19,6 +19,7 @@ from typing import Dict, List, Tuple
 import pandas as pd
 
 from batch_model_trainer_step4 import BatchModelTrainer, ResidualValueModel, safe_filename
+from model_paths import get_model_dirs
 
 
 # 车龄分段定义
@@ -135,8 +136,8 @@ def build_segmented_models(
 
 def main():
     parser = argparse.ArgumentParser(description='分段模型训练程序')
-    parser.add_argument('--data', default='../output/residual_value_data.csv', help='数据文件路径')
-    parser.add_argument('--output', default='../price_model/segmented_model', help='模型输出目录')
+    parser.add_argument('--data', default='../output/merged_residual_value_data_with_dates.csv', help='数据文件路径')
+    parser.add_argument('--output', default=str(get_model_dirs(Path(__file__).parent.parent)['segmented']), help='模型输出目录')
     parser.add_argument('--min_samples', type=int, default=30, help='每段最小样本数')
     parser.add_argument('--iqr_factor', type=float, default=1.0, help='IQR过滤系数')
     
@@ -144,7 +145,7 @@ def main():
     
     script_dir = Path(__file__).parent
     data_path = args.data if Path(args.data).is_absolute() else str(script_dir / args.data)
-    output_dir = args.output if Path(args.output).is_absolute() else str(script_dir / args.output)
+    output_dir = str(Path(args.output).resolve())
     
     if not Path(data_path).exists():
         print(f"错误: 数据文件不存在: {data_path}")

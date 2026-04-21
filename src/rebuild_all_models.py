@@ -21,6 +21,7 @@ sys.path.insert(0, str(project_root))
 
 from src.build_brand_series_models_step4 import build_brand_series_models
 from src.build_car_types_models_step4 import build_car_types_models
+from src.model_paths import get_model_dirs
 from src.residual_data_index_step5 import ResidualDataIndex
 
 # 配置日志
@@ -38,8 +39,9 @@ def main():
     # 路径配置
     # data_file = project_root / 'output' / 'residual_value_data.csv'
     data_file = project_root / 'output' / 'merged_residual_value_data.csv'
-    brand_series_model_dir = project_root / 'price_model' / 'brand_series_model'
-    car_types_model_dir = project_root / 'price_model' / 'car_types_model'
+    model_dirs = get_model_dirs(project_root)
+    brand_series_model_dir = model_dirs['brand_series']
+    car_types_model_dir = model_dirs['car_types']
     index_file = project_root / 'index' / 'residual_data_index.pkl'
 
     if not data_file.exists():

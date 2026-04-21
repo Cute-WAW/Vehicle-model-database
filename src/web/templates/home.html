@@ -864,15 +864,23 @@
                     // 价格解释报告
                     if (result.explanation) {
                         const exp = result.explanation;
+                        const explanationSourceText = exp.explanation_source === 'lightgbm_pred_contrib'
+                            ? 'LightGBM 特征贡献'
+                            : '规则推断';
                         html += `
                             <div class="section" style="background: linear-gradient(135deg, rgba(232, 245, 233, 0.5) 0%, rgba(241, 248, 233, 0.5) 100%); border: 1px solid var(--success);">
                                 <h3><i class="fas fa-lightbulb"></i> 价格解释</h3>
                                 <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 15px; line-height: 1.6;">${exp.summary}</p>
                                 <p><strong>置信度:</strong> <span style="color: ${exp.confidence === 'high' ? 'var(--success)' : exp.confidence === 'medium' ? 'var(--warning)' : 'var(--error)'}; font-weight: bold;">${exp.confidence === 'high' ? '⭐⭐⭐ 高' : exp.confidence === 'medium' ? '⭐⭐ 中' : '⭐ 低'}</span></p>
+                                <p><strong>解释来源:</strong> <span style="color: var(--text-secondary);">${explanationSourceText}</span></p>
                         `;
                         
                         if (exp.factors && exp.factors.length > 0) {
-                            html += '<h4 style="margin-top: 15px; color: var(--text-primary);">🔍 影响因素</h4>';
+                            const factorTitle = exp.explanation_source === 'lightgbm_pred_contrib' ? '🔍 模型影响因素' : '🔍 影响因素';
+                            html += `<h4 style="margin-top: 15px; color: var(--text-primary);">${factorTitle}</h4>`;
+                            if (exp.explanation_source === 'lightgbm_pred_contrib') {
+                                html += '<p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 10px;">以下数值为 LightGBM 模型对当前预测价格的近似贡献，用于解释模型判断方向。</p>';
+                            }
                             exp.factors.forEach(f => {
                                 const deltaColor = f.delta >= 0 ? 'var(--success)' : 'var(--error)';
                                 const deltaSign = f.delta >= 0 ? '+' : '';
@@ -895,6 +903,11 @@
                                 <div class="debug-item">使用模型: ${d.model_used}</div>
                                 <div class="debug-item">模型名称: ${d.model_name}</div>
                                 <div class="debug-item">模型类型: ${d.model_type}</div>
+                                <div class="debug-item">模型家族: ${d.model_family || '-'}</div>
+                                <div class="debug-item">请求家族: ${d.requested_model_family || '-'}</div>
+                                <div class="debug-item">最终家族: ${d.final_model_family || '-'}</div>
+                                <div class="debug-item">发生回退: ${d.fallback_triggered ? '是' : '否'}</div>
+                                <div class="debug-item">回退原因: ${d.fallback_reason || '-'}</div>
                                 <div class="debug-item">模型预测: ${d.model_prediction} 万元</div>
                                 <div class="debug-item">模型R²: ${d.model_r2.toFixed(4)}</div>
                             </div>

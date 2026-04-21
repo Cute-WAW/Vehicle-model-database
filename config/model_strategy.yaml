@@ -1,0 +1,2 @@
+default_model_family: lightgbm
+allow_curve_fallback: true

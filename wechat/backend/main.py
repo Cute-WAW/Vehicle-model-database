@@ -51,11 +51,24 @@ logger = logging.getLogger("wechat_backend")
 # ============================================================
 _predictor = None
 
+
+def resolve_wechat_residual_data() -> Path:
+    """Return the best available residual dataset for WeChat backend runtime."""
+    candidates = [
+        PROJECT_ROOT / "output" / "merged_residual_value_data_with_dates.csv",
+        PROJECT_ROOT / "output" / "merged_residual_value_data.csv",
+        PROJECT_ROOT / "output" / "residual_value_data_for_build_model.csv",
+    ]
+    for path in candidates:
+        if path.exists():
+            return path
+    return candidates[-1]
+
 def get_predictor():
     """懒加载并缓存 ResidualPredictor 实例"""
     global _predictor
     if _predictor is None:
-        data_csv = PROJECT_ROOT / "output" / "residual_value_data_for_build_model.csv"
+        data_csv = resolve_wechat_residual_data()
         if not data_csv.exists():
             logger.warning(f"残值数据文件不存在: {data_csv}")
             logger.warning("估价功能将不可用，请先运行 Step2/Step3 生成数据")
@@ -85,13 +98,8 @@ def _patch_api_predictor():
     import api as api_module
     predictor = get_predictor()
     if predictor is not None:
-        # 替换 api 模块中 ResidualPredictor 类为一个工厂函数，始终返回单例
-        class _SingletonPredictor:
-            """代理类，忽略构造参数，始终返回已加载的单例"""
-            def __new__(cls, **kwargs):
-                return predictor
         try:
-            api_module.ResidualPredictor = _SingletonPredictor  # type: ignore
+            api_module.get_shared_predictor = get_predictor  # type: ignore
         except Exception:
             pass  # api 模块可能已经在路由中 import，忽略失败
 

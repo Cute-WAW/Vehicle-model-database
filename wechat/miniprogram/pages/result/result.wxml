@@ -29,9 +29,21 @@
       </text>
     </view>
 
+    <view class="confidence" wx:if="{{result.explanation.explanation_source}}">
+      <text>解释来源: </text>
+      <text class="confidence-value">
+        {{result.explanation.explanation_source === 'lightgbm_pred_contrib' ? 'LightGBM 特征贡献' : '规则推断'}}
+      </text>
+    </view>
+
     <!-- 影响因素 -->
     <view class="factors" wx:if="{{result.explanation.factors.length > 0}}">
-      <view class="factor-title">🔍 影响因素</view>
+      <view class="factor-title">
+        {{result.explanation.explanation_source === 'lightgbm_pred_contrib' ? '🔍 模型影响因素' : '🔍 影响因素'}}
+      </view>
+      <view class="summary" wx:if="{{result.explanation.explanation_source === 'lightgbm_pred_contrib'}}" style="font-size: 24rpx; margin-bottom: 16rpx;">
+        以下为 LightGBM 模型对当前预测价格的近似贡献，用于解释模型判断方向。
+      </view>
       <view class="factor-item" wx:for="{{result.explanation.factors}}" wx:key="name">
         <view class="factor-label">
           <text class="factor-name">{{item.label}}</text>

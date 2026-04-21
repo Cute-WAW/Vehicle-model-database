@@ -48,6 +48,13 @@ class PredictionDebugInfo:
     model_used: str = ""  # "brand_series" 或 "car_type"
     model_name: str = ""
     model_type: str = ""
+    model_family: str = ""
+    requested_model_family: str = ""
+    final_model_family: str = ""
+    fallback_triggered: bool = False
+    fallback_reason: str = ""
+    explanation_source: str = ""
+    feature_contributions: Dict = field(default_factory=dict)
     model_r2: float = 0.0
     model_prediction: float = 0.0
     
@@ -65,6 +72,13 @@ class PredictionDebugInfo:
             'model_used': self.model_used,
             'model_name': self.model_name,
             'model_type': self.model_type,
+            'model_family': self.model_family,
+            'requested_model_family': self.requested_model_family,
+            'final_model_family': self.final_model_family,
+            'fallback_triggered': self.fallback_triggered,
+            'fallback_reason': self.fallback_reason,
+            'explanation_source': self.explanation_source,
+            'feature_contributions': self.feature_contributions,
             'model_r2': self.model_r2,
             'model_prediction': self.model_prediction,
             'similar_vehicles': self.similar_vehicles,
@@ -123,8 +137,11 @@ class ResidualPredictor:
         self,
         brand_series_model_dir: Optional[str] = None,
         car_types_model_dir: Optional[str] = None,
+        lightgbm_brand_series_model_dir: Optional[str] = None,
+        lightgbm_car_types_model_dir: Optional[str] = None,
         residual_data_csv: Optional[str] = None,
-        adjustment_params: Optional[AdjustmentParams] = None
+        adjustment_params: Optional[AdjustmentParams] = None,
+        model_strategy_path: Optional[str] = None,
     ):
         """
         初始化预测器
@@ -132,15 +149,20 @@ class ResidualPredictor:
         Args:
             brand_series_model_dir: 品牌车系模型目录
             car_types_model_dir: 车辆类别模型目录
+            lightgbm_brand_series_model_dir: LightGBM 品牌车系模型目录
+            lightgbm_car_types_model_dir: LightGBM 车辆类别模型目录
             residual_data_csv: 成交数据 CSV 路径
             adjustment_params: 调整参数
+            model_strategy_path: 模型切换配置文件路径
         """
         script_dir = Path(__file__).parent
         
         # 初始化价格预测器
         self.price_predictor = PricePredictor(
             brand_series_model_dir=brand_series_model_dir,
-            car_types_model_dir=car_types_model_dir
+            car_types_model_dir=car_types_model_dir,
+            lightgbm_brand_series_model_dir=lightgbm_brand_series_model_dir,
+            lightgbm_car_types_model_dir=lightgbm_car_types_model_dir,
         )
         
         # 初始化成交数据索引
@@ -187,6 +209,7 @@ class ResidualPredictor:
         
         # 加载自适应区间配置
         self.adaptive_range_config = self._load_adaptive_range_config(script_dir)
+        self.model_strategy_config = self._load_model_strategy_config(script_dir, model_strategy_path)
     
     def predict(
         self,
@@ -250,13 +273,30 @@ class ResidualPredictor:
             
             # ========== Step 2: 模型预测 ==========
             model_price = None
+            debug.requested_model_family = self.model_strategy_config.get('default_model_family', 'curve')
             if new_price and new_price > 0:
-                model_result = self._predict_by_model(brand_series, vehicle_full_name, years, new_price)
+                model_result = self._predict_by_model(
+                    brand_series,
+                    vehicle_full_name,
+                    years,
+                    new_price,
+                    grade,
+                    city,
+                    mileage,
+                    similar,
+                )
                 
                 if model_result['success']:
                     debug.model_used = model_result['model_used']
                     debug.model_name = model_result['model_name']
                     debug.model_type = model_result['model_type']
+                    debug.model_family = model_result.get('model_family', '')
+                    debug.requested_model_family = model_result.get('requested_model_family', debug.requested_model_family)
+                    debug.final_model_family = model_result.get('final_model_family', debug.model_family)
+                    debug.fallback_triggered = model_result.get('fallback_triggered', False)
+                    debug.fallback_reason = model_result.get('fallback_reason', '')
+                    debug.explanation_source = model_result.get('explanation_source', '')
+                    debug.feature_contributions = model_result.get('feature_contributions', {})
                     debug.model_r2 = model_result['r2']
                     debug.model_prediction = model_result['predicted_price']
                     model_price = model_result['predicted_price']
@@ -264,6 +304,12 @@ class ResidualPredictor:
                     logger.warning(f"模型预测失败: {model_result.get('error')}, 将尝试使用相近车辆估价")
                     debug.model_used = "none"
                     debug.model_name = "none"
+                    debug.model_family = ""
+                    debug.final_model_family = ""
+                    debug.fallback_triggered = model_result.get('fallback_triggered', False)
+                    debug.fallback_reason = model_result.get('fallback_reason', model_result.get('error', ''))
+                    debug.explanation_source = model_result.get('explanation_source', '')
+                    debug.feature_contributions = model_result.get('feature_contributions', {})
             else:
                 logger.info("未获取到新车价格，跳过模型预测步骤")
                 debug.model_used = "none"
@@ -272,6 +318,7 @@ class ResidualPredictor:
             # ========== Step 2.5: 针对性优化规则调整 (仅当有模型预测值时) ==========
             if model_price is not None:
                 heuristic_adjustments = []
+                original_model_price = model_price
                 # 新能源
                 if self._is_nev(vehicle_full_name):
                     model_price *= 1.03
@@ -288,6 +335,9 @@ class ResidualPredictor:
                 if heuristic_adjustments:
                     result_info = "+".join(heuristic_adjustments)
                     debug.model_prediction = model_price # 更新显示
+                    if debug.feature_contributions and original_model_price > 0:
+                        scale = model_price / original_model_price
+                        self._scale_feature_contributions(debug.feature_contributions, scale)
             
             # ========== Step 3: 查找完全相同的记录 ==========
             identical = self.data_index.find_identical_records(
@@ -456,6 +506,80 @@ class ResidualPredictor:
         except Exception as e:
             logger.warning(f"加载自适应区间配置失败: {e}，使用默认值")
         return default_config
+
+    def _load_model_strategy_config(self, script_dir: Path, config_path: Optional[str] = None) -> Dict:
+        """加载模型切换策略配置"""
+        if config_path:
+            path = Path(config_path)
+        else:
+            path = script_dir.parent / 'config' / 'model_strategy.yaml'
+
+        default_config = {
+            'default_model_family': 'curve',
+            'allow_curve_fallback': True,
+        }
+
+        try:
+            if path.exists():
+                with open(path, 'r', encoding='utf-8') as f:
+                    config = yaml.safe_load(f) or {}
+                default_config.update(config)
+                logger.info(f"模型切换配置已加载: {path}")
+            else:
+                logger.info(f"模型切换配置不存在，使用默认值: {path}")
+        except Exception as e:
+            logger.warning(f"加载模型切换配置失败: {e}，使用默认值")
+
+        if str(default_config.get('default_model_family', 'curve')).lower() not in {'curve', 'lightgbm'}:
+            logger.warning(
+                "未知的 default_model_family=%s，已回退为 curve",
+                default_config.get('default_model_family')
+            )
+            default_config['default_model_family'] = 'curve'
+
+        return default_config
+
+    def _split_car_type(self, car_type: Optional[str]) -> tuple:
+        """将车辆类别拆分为大类/小类/属性"""
+        if not car_type:
+            return "", "", ""
+
+        parts = str(car_type).split('-', 2)
+        while len(parts) < 3:
+            parts.append("")
+        return parts[0], parts[1], parts[2]
+
+    def _infer_car_type_from_similar(self, similar_vehicles: Optional[List[SimilarVehicle]]) -> Optional[str]:
+        """从相似车辆结果中推断车辆类别"""
+        if not similar_vehicles:
+            return None
+
+        counts: Dict[str, int] = {}
+        for item in similar_vehicles:
+            vehicle_type = getattr(item.record, 'vehicle_type', '') or ''
+            vehicle_size = getattr(item.record, 'vehicle_size', '') or ''
+            vehicle_attr = getattr(item.record, 'vehicle_attr', '') or ''
+            if not (vehicle_type and vehicle_size and vehicle_attr):
+                continue
+            car_type = f"{vehicle_type}-{vehicle_size}-{vehicle_attr}"
+            counts[car_type] = counts.get(car_type, 0) + 1
+
+        if not counts:
+            return None
+
+        return max(counts.items(), key=lambda x: x[1])[0]
+
+    def _scale_feature_contributions(self, contribution_payload: Dict, factor: float) -> None:
+        """Scale price-space contribution deltas to match heuristic-adjusted model price."""
+        if not contribution_payload:
+            return
+
+        if contribution_payload.get('bias_price') is not None:
+            contribution_payload['bias_price'] = round(float(contribution_payload['bias_price']) * factor, 4)
+
+        for item in contribution_payload.get('features', []):
+            if item.get('contribution_price') is not None:
+                item['contribution_price'] = round(float(item['contribution_price']) * factor, 4)
     
     def _apply_adaptive_range(self, price_matrix: Dict, mid_price: float) -> Dict:
         """
@@ -519,48 +643,127 @@ class ResidualPredictor:
         brand_series: str,
         vehicle_full_name: str,
         years: float,
-        new_price: float
+        new_price: float,
+        grade: str,
+        city: str,
+        mileage: float,
+        similar_vehicles: Optional[List[SimilarVehicle]] = None,
     ) -> Dict[str, Any]:
         """
         使用模型预测
         
         优先使用品牌车系模型，如果不存在则使用车辆类别模型
         """
-        # 尝试品牌车系模型
-        result = self.price_predictor.predict_by_brand_series(brand_series, years, new_price)
-        
-        if result.success:
-            return {
-                'success': True,
-                'model_used': 'brand_series',
-                'model_name': brand_series,
-                'model_type': result.model_type,
-                'r2': result.r2,
-                'predicted_price': result.predicted_price,
-                'residual_rate': result.residual_rate
-            }
-        
-        # 回退到车辆类别模型
         car_type = self.data_index.get_car_type_for_brand_series(brand_series)
-        
-        if car_type:
-            result = self.price_predictor.predict_by_car_type(car_type, years, new_price)
-            
+        if not car_type:
+            car_type = self._infer_car_type_from_similar(similar_vehicles)
+        vehicle_type, vehicle_size, vehicle_attr = self._split_car_type(car_type)
+        requested_family = str(self.model_strategy_config.get('default_model_family', 'curve')).lower()
+        if requested_family not in {'curve', 'lightgbm'}:
+            requested_family = 'curve'
+        allow_curve_fallback = bool(self.model_strategy_config.get('allow_curve_fallback', True))
+
+        def _run_family(model_family: str) -> Dict[str, Any]:
+            result = self.price_predictor.predict_by_brand_series(
+                brand_series,
+                years,
+                new_price,
+                grade=grade,
+                city=city,
+                mileage=mileage,
+                vehicle_type=vehicle_type,
+                vehicle_size=vehicle_size,
+                vehicle_attr=vehicle_attr,
+                model_family=model_family,
+            )
+
             if result.success:
                 return {
                     'success': True,
-                    'model_used': 'car_type',
-                    'model_name': car_type,
+                    'model_used': 'brand_series',
+                    'model_name': brand_series,
                     'model_type': result.model_type,
+                    'model_family': result.model_family or model_family,
+                    'requested_model_family': requested_family,
+                    'final_model_family': result.model_family or model_family,
+                    'fallback_triggered': False,
+                    'fallback_reason': '',
+                    'explanation_source': result.explanation_source or 'heuristic_rules',
+                    'feature_contributions': result.feature_contributions or {},
                     'r2': result.r2,
                     'predicted_price': result.predicted_price,
                     'residual_rate': result.residual_rate
                 }
-        
-        return {
-            'success': False,
-            'error': f"无法找到适用的模型: 品牌车系={brand_series}, 车辆类别={car_type}"
-        }
+
+            if car_type:
+                result = self.price_predictor.predict_by_car_type(
+                    car_type,
+                    years,
+                    new_price,
+                    brand_series=brand_series,
+                    grade=grade,
+                    city=city,
+                    mileage=mileage,
+                    vehicle_type=vehicle_type,
+                    vehicle_size=vehicle_size,
+                    vehicle_attr=vehicle_attr,
+                    model_family=model_family,
+                )
+
+                if result.success:
+                    return {
+                        'success': True,
+                        'model_used': 'car_type',
+                        'model_name': car_type,
+                        'model_type': result.model_type,
+                        'model_family': result.model_family or model_family,
+                        'requested_model_family': requested_family,
+                        'final_model_family': result.model_family or model_family,
+                        'fallback_triggered': False,
+                        'fallback_reason': '',
+                        'explanation_source': result.explanation_source or 'heuristic_rules',
+                        'feature_contributions': result.feature_contributions or {},
+                        'r2': result.r2,
+                        'predicted_price': result.predicted_price,
+                        'residual_rate': result.residual_rate
+                    }
+
+            return {
+                'success': False,
+                'requested_model_family': requested_family,
+                'final_model_family': '',
+                'fallback_triggered': False,
+                'fallback_reason': '',
+                'error': (
+                    f"无法找到适用的 {model_family} 模型: "
+                    f"品牌车系={brand_series}, 车辆类别={car_type}"
+                )
+            }
+
+        primary_result = _run_family(requested_family)
+        if primary_result['success']:
+            return primary_result
+
+        if requested_family == 'lightgbm' and allow_curve_fallback:
+            fallback_reason = primary_result.get('error', 'lightgbm prediction failed')
+            fallback_result = _run_family('curve')
+            if fallback_result['success']:
+                fallback_result['requested_model_family'] = requested_family
+                fallback_result['final_model_family'] = 'curve'
+                fallback_result['fallback_triggered'] = True
+                fallback_result['fallback_reason'] = fallback_reason
+                return fallback_result
+
+            return {
+                'success': False,
+                'requested_model_family': requested_family,
+                'final_model_family': '',
+                'fallback_triggered': True,
+                'fallback_reason': fallback_reason,
+                'error': fallback_result.get('error', fallback_reason)
+            }
+
+        return primary_result
     
     def _infer_new_price(self, brand_series: str, similar_vehicles: List = None) -> Optional[float]:
         """

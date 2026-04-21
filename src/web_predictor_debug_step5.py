@@ -123,6 +123,11 @@ class DebugInfo(BaseModel):
     model_used: str
     model_name: str
     model_type: str
+    model_family: Optional[str] = ""
+    requested_model_family: Optional[str] = ""
+    final_model_family: Optional[str] = ""
+    fallback_triggered: Optional[bool] = False
+    fallback_reason: Optional[str] = ""
     model_r2: float
     model_prediction: float
     similar_vehicles: List[dict]

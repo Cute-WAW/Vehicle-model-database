@@ -88,6 +88,7 @@ class PriceExplanationReport:
     # Summary
     summary: str = ""
     confidence: str = "medium"  # low, medium, high
+    explanation_source: str = "heuristic_rules"
     
     def to_dict(self) -> Dict:
         return {
@@ -107,7 +108,8 @@ class PriceExplanationReport:
             'similar_vehicles': [v.to_dict() for v in self.similar_vehicles],
             'similar_avg_price': round(self.similar_avg_price, 2),
             'summary': self.summary,
-            'confidence': self.confidence
+            'confidence': self.confidence,
+            'explanation_source': self.explanation_source
         }
     
     def to_json(self, indent: int = 2) -> str:
@@ -135,6 +137,17 @@ class PriceExplainer:
         'popular_colors': ['白色', '黑色', '银色', '灰色'],
         'unpopular_color_penalty': 0.02
     }
+    FEATURE_LABELS = {
+        '使用年限': '车龄',
+        '新车的价格': '新车指导价',
+        '行驶里程': '行驶里程',
+        '品牌车系': '品牌车系',
+        '车辆评级': '车况评级',
+        '车辆大类': '车辆大类',
+        '车辆小类': '车辆小类',
+        '车辆属性': '车辆属性',
+        '城市': '城市',
+    }
     
     def __init__(self, prediction_result, config: Optional[Dict] = None):
         """
@@ -149,6 +162,49 @@ class PriceExplainer:
         
         # Extract debug info
         self.debug = prediction_result.debug if prediction_result.debug else None
+
+    def _describe_lightgbm_feature(self, name: str, value: Any, contribution_price: float) -> str:
+        """生成 LightGBM 特征贡献的人类可读说明"""
+        direction = "抬高" if contribution_price >= 0 else "压低"
+
+        if name == "使用年限":
+            return f"当前车龄 {value} 年，对模型估值判断呈{direction}作用"
+        if name == "新车的价格":
+            return f"当前新车指导价 {value} 万元，对模型估值判断呈{direction}作用"
+        if name == "行驶里程":
+            return f"当前行驶里程 {value} 万公里，对模型估值判断呈{direction}作用"
+        if name == "品牌车系":
+            return f"品牌车系“{value}”对模型估值判断呈{direction}作用"
+        if name == "车辆评级":
+            return f"车辆评级“{value}”对模型估值判断呈{direction}作用"
+        if name == "城市":
+            return f"城市“{value}”对模型估值判断呈{direction}作用"
+        return f"{self.FEATURE_LABELS.get(name, name)}“{value}”对模型估值判断呈{direction}作用"
+
+    def extract_lightgbm_factors(self) -> List[ConditionFactor]:
+        """从 debug 中提取 LightGBM 真实特征贡献，映射为影响因素展示"""
+        if not self.debug or not getattr(self.debug, 'feature_contributions', None):
+            return []
+
+        payload = self.debug.feature_contributions
+        raw_features = payload.get('features', [])
+        top_features = [item for item in raw_features if abs(item.get('contribution_price') or 0.0) >= 0.01][:5]
+        factors: List[ConditionFactor] = []
+        for item in top_features:
+            name = item.get('name', 'unknown')
+            label = self.FEATURE_LABELS.get(name, name)
+            contribution_price = float(item.get('contribution_price') or 0.0)
+            factors.append(
+                ConditionFactor(
+                    name=name,
+                    label=label,
+                    delta=contribution_price,
+                    reason=self._describe_lightgbm_feature(name, item.get('value'), contribution_price),
+                    value=item.get('value'),
+                    benchmark=None,
+                )
+            )
+        return factors
         
     def analyze_age_factor(self, years: float, avg_years: float = 8.0) -> ConditionFactor:
         """分析车龄因素"""
@@ -325,21 +381,27 @@ class PriceExplainer:
         years = years or 5.0
         mileage = mileage or 5.0
         grade = grade or "中"
-        
+
+        explanation_source = getattr(self.debug, 'explanation_source', '') if self.debug else ""
+
         # Analyze each factor
-        factors = [
-            self.analyze_age_factor(years),
-            self.analyze_mileage_factor(mileage, years),
-            self.analyze_transfer_factor(transfer_count),
-            self.analyze_color_factor(color),
-            self.analyze_condition_factor(grade)
-        ]
-        
-        # Filter out zero-impact factors for display
-        significant_factors = [f for f in factors if abs(f.delta) > 0.01]
-        
-        # Calculate total delta
-        total_delta = sum(f.delta for f in factors)
+        if explanation_source == "lightgbm_pred_contrib":
+            significant_factors = self.extract_lightgbm_factors()
+            total_delta = sum(f.delta for f in significant_factors)
+        else:
+            factors = [
+                self.analyze_age_factor(years),
+                self.analyze_mileage_factor(mileage, years),
+                self.analyze_transfer_factor(transfer_count),
+                self.analyze_color_factor(color),
+                self.analyze_condition_factor(grade)
+            ]
+
+            # Filter out zero-impact factors for display
+            significant_factors = [f for f in factors if abs(f.delta) > 0.01]
+
+            # Calculate total delta
+            total_delta = sum(f.delta for f in factors)
         
         # Extract similar vehicles
         similar_vehicles = self.extract_similar_vehicles()
@@ -376,12 +438,20 @@ class PriceExplainer:
         
         # Generate summary
         factor_summary = "、".join([f.label for f in significant_factors]) if significant_factors else "无显著调整"
-        summary = (
-            f"基于{model_name}残值模型预测({model_price:.2f}万)，"
-            f"考虑{factor_summary}等因素，"
-            f"参考{len(similar_vehicles)}辆相似车成交价，"
-            f"建议价格区间为{price_low:.2f}-{price_high:.2f}万元。"
-        )
+        if explanation_source == "lightgbm_pred_contrib":
+            summary = (
+                f"基于 {model_name} 的 LightGBM 残值模型预测({model_price:.2f}万)，"
+                f"模型贡献中主要受{factor_summary}影响，"
+                f"并参考{len(similar_vehicles)}辆相似车成交价，"
+                f"建议价格区间为{price_low:.2f}-{price_high:.2f}万元。"
+            )
+        else:
+            summary = (
+                f"基于{model_name}残值模型预测({model_price:.2f}万)，"
+                f"考虑{factor_summary}等因素，"
+                f"参考{len(similar_vehicles)}辆相似车成交价，"
+                f"建议价格区间为{price_low:.2f}-{price_high:.2f}万元。"
+            )
         
         return PriceExplanationReport(
             price_low=price_low,
@@ -396,7 +466,8 @@ class PriceExplainer:
             similar_vehicles=similar_vehicles,
             similar_avg_price=similar_avg,
             summary=summary,
-            confidence=confidence
+            confidence=confidence,
+            explanation_source=explanation_source or "heuristic_rules"
         )
 
 
